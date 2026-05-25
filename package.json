@@ -47,7 +47,7 @@
       "target": [
         { "target": "dmg", "arch": ["arm64"] }
       ],
-      "identity": null,
+      "identity": "Dieu-Donne Nazzah (Personal)",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "artifactName": "Terminal-Workspace-${version}-${arch}.${ext}"

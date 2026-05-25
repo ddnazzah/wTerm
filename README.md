@@ -74,7 +74,9 @@ pnpm dist:mac
 open release/0.1.0/Terminal-Workspace-0.1.0-arm64.dmg
 ```
 
-Drag **Terminal Workspace** to **Applications**. First launch: right-click the app → **Open** → **Open** in the dialog (the app isn't code-signed). After that it launches normally.
+Drag **Terminal Workspace** to **Applications**. First launch: right-click the app → **Open** → **Open** in the dialog (the app is signed with a personal self-signed certificate, so Gatekeeper doesn't recognize the authority and asks once). After that it launches normally and macOS treats it as a known app for permission persistence.
+
+The build is signed with a local self-signed identity (`Dieu-Donne Nazzah (Personal)`) held in the developer's login Keychain. Anyone else cloning this repo to build will need to either remove `build.mac.identity` from `package.json` or substitute their own.
 
 ## Keyboard shortcuts
 
