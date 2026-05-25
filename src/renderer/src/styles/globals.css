@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+@import '@xterm/xterm/css/xterm.css';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  -webkit-app-region: no-drag;
+  user-select: none;
+  overflow: hidden;
+}
+
+.app-titlebar {
+  -webkit-app-region: drag;
+}
+
+.app-titlebar button,
+.app-titlebar input {
+  -webkit-app-region: no-drag;
+}
+
+.terminal-host {
+  height: 100%;
+  width: 100%;
+  padding: 8px 4px 8px 12px;
+  background: var(--background, #0b0b0f);
+}
+
+.terminal-host .xterm,
+.terminal-host .xterm-viewport {
+  height: 100% !important;
+  background: transparent !important;
+}
+
+.terminal-host .xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+.terminal-host .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
