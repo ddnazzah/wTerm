@@ -6,7 +6,7 @@ A desktop IDE for working with multiple projects and multiple long-running termi
 
 Inspired by the KESA agent workspace, but with real terminals on the right instead of a chat panel.
 
-![macOS](https://img.shields.io/badge/macOS-arm64-black) ![Electron](https://img.shields.io/badge/Electron-42-47848F) ![React](https://img.shields.io/badge/React-19-61DAFB) ![HeroUI](https://img.shields.io/badge/HeroUI-v3-7c3aed) ![Tailwind](https://img.shields.io/badge/Tailwind-v4-06B6D4)
+![macOS](https://img.shields.io/badge/macOS-arm64-black) ![Windows](https://img.shields.io/badge/Windows-x64-0078D6) ![Electron](https://img.shields.io/badge/Electron-42-47848F) ![React](https://img.shields.io/badge/React-19-61DAFB) ![HeroUI](https://img.shields.io/badge/HeroUI-v3-7c3aed) ![Tailwind](https://img.shields.io/badge/Tailwind-v4-06B6D4)
 
 ## What it does
 
@@ -57,14 +57,15 @@ All terminals across all projects stay mounted as absolutely-positioned siblings
 
 ## Development
 
-Requires Node 20+, pnpm 9+, and macOS arm64 (for now).
+Requires Node 20+ and pnpm 9+. Development is best on macOS arm64 (PTY behavior matches the prod target most closely), but `pnpm dev` runs on Windows x64 too.
 
 ```bash
 pnpm install            # also rebuilds node-pty against Electron's Node ABI
 pnpm dev                # main + preload + renderer with HMR
 pnpm typecheck          # tsc on both project references
 pnpm build              # production bundles → out/
-pnpm dist:mac           # full DMG → release/{version}/
+pnpm dist:mac           # macOS DMG  → release/{version}/
+pnpm dist:win           # Windows NSIS installer → release/{version}/
 ```
 
 If `pnpm install` doesn't download the Electron binary (rare pnpm-10 quirk), run `node node_modules/electron/install.js` once.
@@ -96,7 +97,8 @@ Things this doesn't do yet but probably should:
 - **Daemonized PTYs** so running commands survive app restart (would need a separate long-lived process)
 - **Split view** (two terminals side-by-side within one project)
 - **Custom theming** — terminal palette derived from HeroUI tokens
-- **Linux / Windows support** — currently arm64 macOS only
+- **Linux support** — currently macOS arm64 and Windows x64 only
+- **Code signing on Windows** — installer is unsigned, SmartScreen prompts on first launch
 - **Code signing + notarization** — first-launch needs the right-click bypass without it
 
 ## License

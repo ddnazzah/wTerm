@@ -17,7 +17,8 @@
     "postinstall": "electron-rebuild -f -w node-pty || true",
     "build:icons": "node scripts/build-icons.mjs",
     "dist": "npm run build:icons && electron-vite build && electron-builder",
-    "dist:mac": "npm run build:icons && electron-vite build && electron-builder --mac"
+    "dist:mac": "npm run build:icons && electron-vite build && electron-builder --mac",
+    "dist:win": "npm run build:icons && electron-vite build && electron-builder --win"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -60,6 +61,23 @@
     },
     "dmg": {
       "writeUpdateInfo": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "wTerm-${version}-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": false
     },
     "npmRebuild": false
   },
