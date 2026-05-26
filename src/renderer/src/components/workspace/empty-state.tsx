@@ -1,4 +1,5 @@
 import { Button } from '@heroui/react'
+import logoUrl from '../../../../../resources/logo.svg?url'
 
 interface Props {
   hasSelection: boolean
@@ -9,8 +10,19 @@ interface Props {
 export function EmptyState({ hasSelection, onCreateTerminal, onAddProject }: Props) {
   if (!hasSelection) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-foreground/40 gap-3">
-        <div className="text-sm">No project selected</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6">
+        <img
+          src={logoUrl}
+          alt="wTerm"
+          width={112}
+          height={112}
+          className="select-none opacity-95"
+          draggable={false}
+        />
+        <div className="flex flex-col items-center gap-1">
+          <div className="text-base font-medium text-foreground/85">wTerm</div>
+          <div className="text-[12px] text-foreground/45">Multi-project terminal IDE</div>
+        </div>
         <Button size="sm" variant="secondary" onPress={() => onAddProject?.()}>
           Add a project folder
         </Button>
@@ -18,7 +30,7 @@ export function EmptyState({ hasSelection, onCreateTerminal, onAddProject }: Pro
     )
   }
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-foreground/50 gap-3">
+    <div className="absolute inset-0 flex flex-col items-center justify-center text-foreground/50 gap-3">
       <div className="text-sm">No terminals yet for this project.</div>
       <Button size="sm" onPress={() => onCreateTerminal?.()}>
         + New terminal

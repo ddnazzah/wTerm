@@ -30,6 +30,8 @@ export function registerTerminalIpc(pty: PtyManager): void {
     }
   )
 
+  ipcMain.handle(IPC.terminals.attach, (_e, id: string): string => pty.attach(id))
+
   ipcMain.handle(IPC.terminals.write, (_e, id: string, data: string): void => {
     pty.write(id, data)
   })

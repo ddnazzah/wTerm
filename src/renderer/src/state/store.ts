@@ -1,12 +1,144 @@
 import { create } from 'zustand'
 import type { Project, ProjectId, TerminalId, TerminalRecord } from '@shared/types'
 
+export const SIDEBAR_MIN_WIDTH = 180
+export const SIDEBAR_MAX_WIDTH = 480
+export const SIDEBAR_DEFAULT_WIDTH = 256
+
+export const RIGHT_SIDEBAR_MIN_WIDTH = 260
+export const RIGHT_SIDEBAR_MAX_WIDTH = 640
+export const RIGHT_SIDEBAR_DEFAULT_WIDTH = 340
+
+export const FILE_PANE_MIN_WIDTH = 320
+export const FILE_PANE_MAX_WIDTH = 1200
+export const FILE_PANE_DEFAULT_WIDTH = 560
+
+const SIDEBAR_WIDTH_KEY = 'tw:sidebar-width'
+const SIDEBAR_COLLAPSED_KEY = 'tw:sidebar-collapsed'
+const RIGHT_SIDEBAR_WIDTH_KEY = 'tw:right-sidebar-width'
+const RIGHT_SIDEBAR_COLLAPSED_KEY = 'tw:right-sidebar-collapsed'
+const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
+const FILE_PANE_WIDTH_KEY = 'tw:file-pane-width'
+
+export type RightSidebarTab = 'files' | 'git'
+
+export interface OpenedFile {
+  projectId: string
+  path: string
+}
+
+export type FileTabKey = string // `${projectId}::${path}`
+export const tabKey = (f: OpenedFile): FileTabKey => `${f.projectId}::${f.path}`
+
+export type FileLoadState =
+  | { kind: 'loading' }
+  | { kind: 'text'; current: string; saved: string }
+  | { kind: 'binary' }
+  | { kind: 'error'; message: string }
+
+const clampSidebarWidth = (w: number): number =>
+  Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(w)))
+
+const clampRightSidebarWidth = (w: number): number =>
+  Math.min(RIGHT_SIDEBAR_MAX_WIDTH, Math.max(RIGHT_SIDEBAR_MIN_WIDTH, Math.round(w)))
+
+const clampFilePaneWidth = (w: number): number =>
+  Math.min(FILE_PANE_MAX_WIDTH, Math.max(FILE_PANE_MIN_WIDTH, Math.round(w)))
+
+const readInitialSidebarWidth = (): number => {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY)
+    const n = raw ? Number.parseInt(raw, 10) : NaN
+    return Number.isFinite(n) ? clampSidebarWidth(n) : SIDEBAR_DEFAULT_WIDTH
+  } catch {
+    return SIDEBAR_DEFAULT_WIDTH
+  }
+}
+
+const readInitialSidebarCollapsed = (): boolean => {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const readInitialRightSidebarWidth = (): number => {
+  try {
+    const raw = localStorage.getItem(RIGHT_SIDEBAR_WIDTH_KEY)
+    const n = raw ? Number.parseInt(raw, 10) : NaN
+    return Number.isFinite(n) ? clampRightSidebarWidth(n) : RIGHT_SIDEBAR_DEFAULT_WIDTH
+  } catch {
+    return RIGHT_SIDEBAR_DEFAULT_WIDTH
+  }
+}
+
+const readInitialRightSidebarCollapsed = (): boolean => {
+  try {
+    // default to OPEN; explicit '1' means collapsed
+    return localStorage.getItem(RIGHT_SIDEBAR_COLLAPSED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const readInitialRightSidebarTab = (): RightSidebarTab => {
+  try {
+    const raw = localStorage.getItem(RIGHT_SIDEBAR_TAB_KEY)
+    return raw === 'git' ? 'git' : 'files'
+  } catch {
+    return 'files'
+  }
+}
+
+const readInitialFilePaneWidth = (): number => {
+  try {
+    const raw = localStorage.getItem(FILE_PANE_WIDTH_KEY)
+    const n = raw ? Number.parseInt(raw, 10) : NaN
+    return Number.isFinite(n) ? clampFilePaneWidth(n) : FILE_PANE_DEFAULT_WIDTH
+  } catch {
+    return FILE_PANE_DEFAULT_WIDTH
+  }
+}
+
 interface WorkspaceState {
   projects: Project[]
   selectedProjectId: ProjectId | null
   activeTerminalByProject: Record<ProjectId, TerminalId | null>
   expandedProjectIds: Record<ProjectId, boolean>
   unreadByTerminal: Record<TerminalId, number>
+  titleByTerminal: Record<TerminalId, string>
+  busyByTerminal: Record<TerminalId, boolean>
+
+  sidebarWidth: number
+  sidebarCollapsed: boolean
+  setSidebarWidth: (width: number) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
+  toggleSidebar: () => void
+
+  rightSidebarWidth: number
+  rightSidebarCollapsed: boolean
+  rightSidebarTab: RightSidebarTab
+  setRightSidebarWidth: (width: number) => void
+  setRightSidebarCollapsed: (collapsed: boolean) => void
+  toggleRightSidebar: () => void
+  setRightSidebarTab: (tab: RightSidebarTab) => void
+
+  filePaneWidth: number
+  setFilePaneWidth: (width: number) => void
+
+  openFiles: OpenedFile[]
+  /** Per-project active file path (null = no file open in that project). */
+  activeFileByProject: Record<string, string | null>
+  /** Load + edit state per tab. */
+  fileStates: Record<FileTabKey, FileLoadState>
+
+  openFile: (file: OpenedFile) => void
+  closeFile: (file: OpenedFile) => void
+  setActiveFile: (projectId: string, path: string | null) => void
+  setFileState: (file: OpenedFile, state: FileLoadState) => void
+  setFileContent: (file: OpenedFile, content: string) => void
+  markFileSaved: (file: OpenedFile, content: string) => void
 
   setProjects: (
     projects: Project[],
@@ -30,6 +162,10 @@ interface WorkspaceState {
 
   bumpUnread: (terminalId: TerminalId) => void
   clearUnread: (terminalId: TerminalId) => void
+
+  setTerminalTitle: (terminalId: TerminalId, title: string) => void
+
+  setTerminalBusy: (terminalId: TerminalId, busy: boolean) => void
 }
 
 export const useWorkspace = create<WorkspaceState>((set) => ({
@@ -38,6 +174,168 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   activeTerminalByProject: {},
   expandedProjectIds: {},
   unreadByTerminal: {},
+  titleByTerminal: {},
+  busyByTerminal: {},
+
+  sidebarWidth: readInitialSidebarWidth(),
+  sidebarCollapsed: readInitialSidebarCollapsed(),
+
+  rightSidebarWidth: readInitialRightSidebarWidth(),
+  rightSidebarCollapsed: readInitialRightSidebarCollapsed(),
+  rightSidebarTab: readInitialRightSidebarTab(),
+
+  filePaneWidth: readInitialFilePaneWidth(),
+
+  setFilePaneWidth: (width) => {
+    const next = clampFilePaneWidth(width)
+    set({ filePaneWidth: next })
+    try {
+      localStorage.setItem(FILE_PANE_WIDTH_KEY, String(next))
+    } catch {
+      // ignore
+    }
+  },
+
+  setRightSidebarWidth: (width) => {
+    const next = clampRightSidebarWidth(width)
+    set({ rightSidebarWidth: next })
+    try {
+      localStorage.setItem(RIGHT_SIDEBAR_WIDTH_KEY, String(next))
+    } catch {
+      // ignore
+    }
+  },
+
+  setRightSidebarCollapsed: (collapsed) => {
+    set({ rightSidebarCollapsed: collapsed })
+    try {
+      localStorage.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  },
+
+  toggleRightSidebar: () =>
+    set((state) => {
+      const next = !state.rightSidebarCollapsed
+      try {
+        localStorage.setItem(RIGHT_SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
+      } catch {
+        // ignore
+      }
+      return { rightSidebarCollapsed: next }
+    }),
+
+  setRightSidebarTab: (tab) => {
+    set({ rightSidebarTab: tab })
+    try {
+      localStorage.setItem(RIGHT_SIDEBAR_TAB_KEY, tab)
+    } catch {
+      // ignore
+    }
+  },
+
+  openFiles: [],
+  activeFileByProject: {},
+  fileStates: {},
+
+  openFile: (file) =>
+    set((state) => {
+      const key = tabKey(file)
+      const alreadyOpen = state.openFiles.some(
+        (f) => f.projectId === file.projectId && f.path === file.path
+      )
+      return {
+        openFiles: alreadyOpen ? state.openFiles : [...state.openFiles, file],
+        activeFileByProject: { ...state.activeFileByProject, [file.projectId]: file.path },
+        fileStates: alreadyOpen
+          ? state.fileStates
+          : { ...state.fileStates, [key]: { kind: 'loading' } },
+      }
+    }),
+
+  closeFile: (file) =>
+    set((state) => {
+      const key = tabKey(file)
+      const remaining = state.openFiles.filter(
+        (f) => !(f.projectId === file.projectId && f.path === file.path)
+      )
+      const wasActive = state.activeFileByProject[file.projectId] === file.path
+      const nextActive: string | null = wasActive
+        ? remaining
+            .filter((f) => f.projectId === file.projectId)
+            .at(-1)?.path ?? null
+        : state.activeFileByProject[file.projectId] ?? null
+      const { [key]: _omit, ...rest } = state.fileStates
+      return {
+        openFiles: remaining,
+        activeFileByProject: { ...state.activeFileByProject, [file.projectId]: nextActive },
+        fileStates: rest,
+      }
+    }),
+
+  setActiveFile: (projectId, path) =>
+    set((state) => ({
+      activeFileByProject: { ...state.activeFileByProject, [projectId]: path },
+    })),
+
+  setFileState: (file, fileState) =>
+    set((state) => ({
+      fileStates: { ...state.fileStates, [tabKey(file)]: fileState },
+    })),
+
+  setFileContent: (file, content) =>
+    set((state) => {
+      const key = tabKey(file)
+      const prev = state.fileStates[key]
+      if (!prev || prev.kind !== 'text') return state
+      return {
+        fileStates: { ...state.fileStates, [key]: { ...prev, current: content } },
+      }
+    }),
+
+  markFileSaved: (file, content) =>
+    set((state) => {
+      const key = tabKey(file)
+      const prev = state.fileStates[key]
+      if (!prev || prev.kind !== 'text') return state
+      return {
+        fileStates: {
+          ...state.fileStates,
+          [key]: { kind: 'text', current: content, saved: content },
+        },
+      }
+    }),
+
+  setSidebarWidth: (width) => {
+    const next = clampSidebarWidth(width)
+    set({ sidebarWidth: next })
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next))
+    } catch {
+      // ignore — storage may be unavailable
+    }
+  },
+
+  setSidebarCollapsed: (collapsed) => {
+    set({ sidebarCollapsed: collapsed })
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  },
+
+  toggleSidebar: () =>
+    set((state) => {
+      const next = !state.sidebarCollapsed
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0')
+      } catch {
+        // ignore
+      }
+      return { sidebarCollapsed: next }
+    }),
 
   setProjects: (projects, opts) =>
     set((state) => {
@@ -132,6 +430,8 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       const remaining = project ? project.terminals.filter((t) => t.id !== terminalId) : []
       const wasActive = state.activeTerminalByProject[projectId] === terminalId
       const { [terminalId]: _omittedUnread, ...unreadRest } = state.unreadByTerminal
+      const { [terminalId]: _omittedTitle, ...titleRest } = state.titleByTerminal
+      const { [terminalId]: _omittedBusy, ...busyRest } = state.busyByTerminal
       nextActive = wasActive
         ? remaining[0]?.id ?? null
         : state.activeTerminalByProject[projectId]
@@ -144,6 +444,8 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
           [projectId]: nextActive ?? null,
         },
         unreadByTerminal: unreadRest,
+        titleByTerminal: titleRest,
+        busyByTerminal: busyRest,
       }
     })
     if (nextActive !== undefined) {
@@ -152,13 +454,17 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   },
 
   renameTerminalLocal: (projectId, terminalId, name) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId
-          ? { ...p, terminals: p.terminals.map((t) => (t.id === terminalId ? { ...t, name } : t)) }
-          : p
-      ),
-    })),
+    set((state) => {
+      const { [terminalId]: _omittedTitle, ...titleRest } = state.titleByTerminal
+      return {
+        projects: state.projects.map((p) =>
+          p.id === projectId
+            ? { ...p, terminals: p.terminals.map((t) => (t.id === terminalId ? { ...t, name } : t)) }
+            : p
+        ),
+        titleByTerminal: titleRest,
+      }
+    }),
 
   setActiveTerminal: (projectId, terminalId) => {
     set((state) => ({
@@ -193,5 +499,31 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       if (!state.unreadByTerminal[terminalId]) return state
       const { [terminalId]: _omitted, ...rest } = state.unreadByTerminal
       return { unreadByTerminal: rest }
+    }),
+
+  setTerminalTitle: (terminalId, title) =>
+    set((state) => {
+      const trimmed = title.trim()
+      const current = state.titleByTerminal[terminalId]
+      if (!trimmed) {
+        if (!current) return state
+        const { [terminalId]: _omitted, ...rest } = state.titleByTerminal
+        return { titleByTerminal: rest }
+      }
+      if (current === trimmed) return state
+      return {
+        titleByTerminal: { ...state.titleByTerminal, [terminalId]: trimmed },
+      }
+    }),
+
+  setTerminalBusy: (terminalId, busy) =>
+    set((state) => {
+      const current = !!state.busyByTerminal[terminalId]
+      if (current === busy) return state
+      if (!busy) {
+        const { [terminalId]: _omitted, ...rest } = state.busyByTerminal
+        return { busyByTerminal: rest }
+      }
+      return { busyByTerminal: { ...state.busyByTerminal, [terminalId]: true } }
     }),
 }))

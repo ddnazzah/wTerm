@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ProjectList } from './components/sidebar/project-list'
+import { RightSidebar } from './components/right-sidebar/right-sidebar'
+import { RightActivityBar } from './components/right-activity-bar'
 import { TerminalPane } from './components/workspace/terminal-pane'
 import { EmptyState } from './components/workspace/empty-state'
+import { FileViewer } from './components/workspace/file-viewer'
+import { FileTabs } from './components/workspace/file-tabs'
+import { SettingsModal } from './components/settings-modal'
 import { useProjects } from './hooks/use-projects'
 import { useWorkspace } from './state/store'
 import type { Project, TerminalRecord } from '@shared/types'
@@ -16,6 +21,45 @@ export default function App() {
   const setProjectExpanded = useWorkspace((s) => s.setProjectExpanded)
   const bumpUnread = useWorkspace((s) => s.bumpUnread)
   const clearUnread = useWorkspace((s) => s.clearUnread)
+  const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
+  const sidebarCollapsed = useWorkspace((s) => s.sidebarCollapsed)
+  const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
+  const rightSidebarCollapsed = useWorkspace((s) => s.rightSidebarCollapsed)
+  const toggleRightSidebar = useWorkspace((s) => s.toggleRightSidebar)
+  const openFiles = useWorkspace((s) => s.openFiles)
+  const hasOpenFiles = !!selectedProject && openFiles.some((f) => f.projectId === selectedProject.id)
+  const filePaneWidth = useWorkspace((s) => s.filePaneWidth)
+  const setFilePaneWidth = useWorkspace((s) => s.setFilePaneWidth)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const pendingFocusRef = useRef<{ projectId: string; terminalId: string } | null>(null)
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+
+  const onResizerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault()
+      dragRef.current = { startX: e.clientX, startWidth: filePaneWidth }
+      e.currentTarget.setPointerCapture(e.pointerId)
+      document.body.style.cursor = 'col-resize'
+    },
+    [filePaneWidth]
+  )
+
+  const onResizerPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current
+      if (!drag) return
+      setFilePaneWidth(drag.startWidth - (e.clientX - drag.startX))
+    },
+    [setFilePaneWidth]
+  )
+
+  const onResizerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return
+    dragRef.current = null
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    document.body.style.cursor = ''
+  }, [])
 
   const activeTerminalId = selectedProject
     ? activeTerminalByProject[selectedProject.id] ?? null
@@ -61,6 +105,25 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey)) return
+
+      if (e.key === ',') {
+        e.preventDefault()
+        setSettingsOpen((v) => !v)
+        return
+      }
+
+      if ((e.key === 'b' || e.key === 'B') && e.shiftKey) {
+        e.preventDefault()
+        toggleRightSidebar()
+        return
+      }
+
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault()
+        toggleSidebar()
+        return
+      }
+
       if (!selectedProject) return
 
       if (e.key === 't') {
@@ -77,16 +140,26 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedProject, addTerminal, removeTerminalLocal, activeTerminalId])
+  }, [
+    selectedProject,
+    addTerminal,
+    removeTerminalLocal,
+    activeTerminalId,
+    toggleSidebar,
+    toggleRightSidebar,
+  ])
 
   const handleBell = useCallback(
     (project: Project, terminal: TerminalRecord) => {
       const isVisible =
         project.id === selectedProject?.id && terminal.id === activeTerminalId
       const focused = document.hasFocus()
-      if (isVisible && focused) return
 
-      bumpUnread(terminal.id)
+      if (!(isVisible && focused)) {
+        bumpUnread(terminal.id)
+        pendingFocusRef.current = { projectId: project.id, terminalId: terminal.id }
+      }
+
       void window.api.system.notify({
         title: project.name,
         body: `${terminal.name} wants your input`,
@@ -97,16 +170,57 @@ export default function App() {
     [selectedProject, activeTerminalId, bumpUnread]
   )
 
+  useEffect(() => {
+    const onWindowFocus = (): void => {
+      const pending = pendingFocusRef.current
+      if (!pending) return
+      pendingFocusRef.current = null
+      selectProject(pending.projectId)
+      setProjectExpanded(pending.projectId, true)
+      setActiveTerminal(pending.projectId, pending.terminalId)
+      clearUnread(pending.terminalId)
+    }
+    window.addEventListener('focus', onWindowFocus)
+    return () => window.removeEventListener('focus', onWindowFocus)
+  }, [selectProject, setProjectExpanded, setActiveTerminal, clearUnread])
+
   const showEmptyNoProject = !selectedProject
   const showEmptyNoTerminals = !!selectedProject && selectedProject.terminals.length === 0
 
   return (
     <div className="flex h-screen w-screen bg-background text-foreground">
-      <ProjectList />
+      {!sidebarCollapsed && <ProjectList />}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="app-titlebar h-11 flex items-center px-4 border-b border-foreground/10">
+        <header
+          className={`app-titlebar h-11 flex items-center gap-2 px-4 border-b border-accent/14 ${
+            sidebarCollapsed ? 'pl-20' : ''
+          }`}
+        >
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Show sidebar"
+              title="Show sidebar (⌘B)"
+              className="flex items-center justify-center w-6 h-6 -ml-1 rounded-md text-foreground/50 hover:text-foreground hover:bg-foreground/10 transition-colors"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
           {selectedProject ? (
-            <div className="flex items-center gap-2 min-w-0 text-sm">
+            <div className="flex items-center gap-2 min-w-0 text-sm flex-shrink-0 pr-3 mr-3 border-r border-accent/14">
               <span
                 className="inline-block w-2 h-2 rounded-full flex-shrink-0"
                 style={{ background: selectedProject.color }}
@@ -116,43 +230,78 @@ export default function App() {
               {activeTerminal && (
                 <>
                   <span className="text-foreground/30">/</span>
-                  <span className="text-foreground/85 truncate">{activeTerminal.name}</span>
+                  <span className="text-foreground/85 truncate">
+                    {titleByTerminal[activeTerminal.id] || activeTerminal.name}
+                  </span>
                 </>
               )}
-              <span className="text-[11px] text-foreground/40 truncate ml-2">
-                {selectedProject.path}
-              </span>
             </div>
           ) : (
-            <span className="text-sm text-foreground/40">Terminal Workspace</span>
+            <span className="text-sm text-foreground/40">wTerm</span>
           )}
+          {selectedProject && hasOpenFiles && (
+            <div className="flex-1 min-w-0 self-stretch -my-px">
+              <FileTabs projectId={selectedProject.id} />
+            </div>
+          )}
+          {!(selectedProject && hasOpenFiles) && <div className="flex-1" />}
         </header>
 
-        <div className="relative flex-1 min-h-0">
-          {allTerminals.map((t) => (
-            <TerminalPane
-              key={t.id}
-              terminalId={t.id}
-              active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
-              onBell={() => handleBell(t.project, t)}
-            />
-          ))}
-          {showEmptyNoProject && (
-            <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
-          )}
-          {showEmptyNoTerminals && (
-            <EmptyState
-              hasSelection
-              onCreateTerminal={() => {
-                if (!selectedProject) return
-                void window.api.terminals.create({ projectId: selectedProject.id }).then((rec) => {
-                  if (rec) addTerminal(selectedProject.id, rec)
-                })
-              }}
-            />
+        <div className="flex-1 min-h-0 flex">
+          <div className="@container relative flex-1 min-w-0 overflow-hidden">
+            {allTerminals.map((t) => (
+              <TerminalPane
+                key={t.id}
+                terminalId={t.id}
+                active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
+                onBell={() => handleBell(t.project, t)}
+              />
+            ))}
+            {showEmptyNoProject && (
+              <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
+            )}
+            {showEmptyNoTerminals && (
+              <EmptyState
+                hasSelection
+                onCreateTerminal={() => {
+                  if (!selectedProject) return
+                  void window.api.terminals.create({ projectId: selectedProject.id }).then((rec) => {
+                    if (rec) addTerminal(selectedProject.id, rec)
+                  })
+                }}
+              />
+            )}
+          </div>
+          {selectedProject && hasOpenFiles && (
+            <>
+              <div
+                onPointerDown={onResizerPointerDown}
+                onPointerMove={onResizerPointerMove}
+                onPointerUp={onResizerPointerUp}
+                onPointerCancel={onResizerPointerUp}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize file pane"
+                className="w-1 cursor-col-resize bg-accent/10 hover:bg-accent/30 transition-colors flex-shrink-0"
+              />
+              <div
+                style={{ width: filePaneWidth }}
+                className="flex-shrink-0 min-w-0 h-full"
+              >
+                <FileViewer projectId={selectedProject.id} />
+              </div>
+            </>
           )}
         </div>
       </main>
+      {selectedProject && !rightSidebarCollapsed && (
+        <RightSidebar project={selectedProject} />
+      )}
+      <RightActivityBar
+        onOpenSettings={() => setSettingsOpen(true)}
+        panelDisabled={!selectedProject}
+      />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

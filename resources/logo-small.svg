@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="wTerm">
+  <defs>
+    <linearGradient id="bgS" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#1A1B23"/>
+      <stop offset="1" stop-color="#08090E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Squircle -->
+  <rect width="1024" height="1024" rx="229" fill="url(#bgS)"/>
+  <rect width="1024" height="1024" rx="229" fill="none" stroke="#97EAB6" stroke-opacity="0.18" stroke-width="6"/>
+
+  <!-- Centered chevron + cursor, beefy enough to survive 16×16 downscaling -->
+  <g transform="translate(512, 512)">
+    <!-- Chevron (>) — height 380, width ~190 -->
+    <polyline points="-190,-190 0,0 -190,190"
+              fill="none"
+              stroke="#97EAB6"
+              stroke-width="92"
+              stroke-linecap="round"
+              stroke-linejoin="round"/>
+    <!-- Cursor block — visually balanced beside the chevron -->
+    <rect x="80" y="-160" width="160" height="320" rx="14" fill="#97EAB6"/>
+  </g>
+</svg>

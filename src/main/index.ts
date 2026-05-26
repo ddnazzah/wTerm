@@ -1,14 +1,37 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { registerProjectIpc } from './ipc/project'
 import { registerTerminalIpc } from './ipc/terminal'
 import { registerSystemIpc, setMainWindow } from './ipc/system'
 import { registerDialogIpc } from './ipc/dialog'
+import { registerFsIpc } from './ipc/fs'
+import { registerGitIpc } from './ipc/git'
+import { registerGitHubIpc } from './ipc/github'
 import { loadState, saveStateNow } from './store/state'
 import { PtyManager } from './pty/manager'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+app.setName('wTerm')
+
+// Resolve the app icon in both dev (cwd = repo root) and packaged builds
+// (where Resources/icon.png is staged by electron-builder from buildResources).
+function resolveAppIcon(): string | undefined {
+  const candidates = [
+    join(__dirname, '../../resources/icon.png'),
+    join(process.resourcesPath ?? '', 'icon.png'),
+    join(process.cwd(), 'resources/icon.png'),
+  ]
+  return candidates.find((p) => p && existsSync(p))
+}
+
+const APP_ICON_PATH = resolveAppIcon()
+if (APP_ICON_PATH && process.platform === 'darwin') {
+  // Sets the dock icon in dev (packaged builds use the .icns inside the bundle).
+  app.dock?.setIcon(nativeImage.createFromPath(APP_ICON_PATH))
+}
 
 let mainWindow: BrowserWindow | null = null
 const ptyManager = new PtyManager()
@@ -22,6 +45,7 @@ function createWindow(): void {
     show: false,
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0b0b0f',
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -55,6 +79,9 @@ app.whenReady().then(async () => {
   registerTerminalIpc(ptyManager)
   registerSystemIpc()
   registerDialogIpc()
+  registerFsIpc()
+  registerGitIpc()
+  registerGitHubIpc()
 
   createWindow()
 

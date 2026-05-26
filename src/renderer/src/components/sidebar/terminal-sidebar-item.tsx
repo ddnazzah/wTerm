@@ -5,6 +5,8 @@ interface Props {
   terminal: TerminalRecord
   active: boolean
   unread: boolean
+  busy?: boolean
+  autoTitle?: string
   onSelect: () => void
   onClose: () => void
   onRename: (name: string) => void
@@ -14,6 +16,8 @@ export function TerminalSidebarItem({
   terminal,
   active,
   unread,
+  busy,
+  autoTitle,
   onSelect,
   onClose,
   onRename,
@@ -22,6 +26,8 @@ export function TerminalSidebarItem({
   const [draft, setDraft] = useState(terminal.name)
 
   useEffect(() => setDraft(terminal.name), [terminal.name])
+
+  const displayName = autoTitle && autoTitle.length > 0 ? autoTitle : terminal.name
 
   const commit = (): void => {
     setEditing(false)
@@ -38,17 +44,18 @@ export function TerminalSidebarItem({
         setEditing(true)
       }}
       className={[
-        'group/term flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-md cursor-pointer transition-colors text-xs',
+        'group/term relative flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-md cursor-pointer transition-colors text-xs',
         active
-          ? 'bg-foreground/10 text-foreground'
+          ? 'bg-accent/12 text-foreground'
           : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
+        busy ? 'terminal-item-busy' : '',
       ].join(' ')}
-      title={terminal.name}
+      title={displayName}
     >
       <span
         className={[
           'inline-block w-1 h-3 rounded-sm flex-shrink-0',
-          active ? 'bg-foreground/70' : 'bg-foreground/25 group-hover/term:bg-foreground/40',
+          active ? 'bg-accent' : 'bg-foreground/25 group-hover/term:bg-foreground/40',
         ].join(' ')}
         aria-hidden
       />
@@ -75,7 +82,7 @@ export function TerminalSidebarItem({
             unread ? 'text-foreground font-medium' : '',
           ].join(' ')}
         >
-          {terminal.name}
+          {displayName}
         </span>
       )}
       {unread && (
@@ -91,7 +98,7 @@ export function TerminalSidebarItem({
           e.stopPropagation()
           onClose()
         }}
-        aria-label={`Close ${terminal.name}`}
+        aria-label={`Close ${displayName}`}
         className="opacity-0 group-hover/term:opacity-100 text-foreground/40 hover:text-foreground hover:bg-foreground/10 rounded-sm w-4 h-4 inline-flex items-center justify-center text-[11px] leading-none transition-opacity"
       >
         ×

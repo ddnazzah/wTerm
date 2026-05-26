@@ -1,0 +1,45 @@
+<svg width="720" height="160" viewBox="0 0 720 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="wTerm">
+  <defs>
+    <linearGradient id="wm-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16171F"/>
+      <stop offset="1" stop-color="#0A0B11"/>
+    </linearGradient>
+    <linearGradient id="wm-iconbg" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#1A1B23"/>
+      <stop offset="1" stop-color="#08090E"/>
+    </linearGradient>
+    <linearGradient id="wm-frontCard" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0F1016"/>
+      <stop offset="1" stop-color="#070810"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Self-contained dark panel so the lockup reads on both light and dark README backgrounds -->
+  <rect x="0" y="0" width="720" height="160" rx="20" fill="url(#wm-bg)"/>
+  <rect x="0" y="0" width="720" height="160" rx="20" fill="none" stroke="#97EAB6" stroke-opacity="0.10" stroke-width="1"/>
+
+  <!-- Mini logo -->
+  <g transform="translate(20, 16)">
+    <rect width="128" height="128" rx="28.6" fill="url(#wm-iconbg)"/>
+
+    <rect x="40" y="30" width="68" height="48" rx="7" fill="none" stroke="#97EAB6" stroke-opacity="0.22" stroke-width="1.6"/>
+    <rect x="30" y="40" width="68" height="48" rx="7" fill="#0E0F16" stroke="#97EAB6" stroke-opacity="0.45" stroke-width="1.8"/>
+    <rect x="20" y="50" width="68" height="48" rx="7" fill="url(#wm-frontCard)" stroke="#97EAB6" stroke-width="2.4"/>
+
+    <polyline points="33,68 47,74 33,80" fill="none" stroke="#97EAB6" stroke-width="5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="55" y="68" width="11" height="14" rx="1.5" fill="#97EAB6"/>
+  </g>
+
+  <!-- Wordmark text — "w" off-white, "Term" mint, set on one line -->
+  <g transform="translate(180, 0)"
+     font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace"
+     font-size="76" font-weight="600" letter-spacing="-2">
+    <text x="0" y="100" fill="#EDEFF3">w</text>
+    <text x="46" y="100" fill="#97EAB6">Term</text>
+  </g>
+
+  <!-- Subtle tag line in muted grey -->
+  <text x="180" y="130" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif"
+        font-size="11" font-weight="500" letter-spacing="3" fill="#6E727B">MULTI-PROJECT TERMINAL IDE</text>
+</svg>

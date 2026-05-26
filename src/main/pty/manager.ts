@@ -2,6 +2,7 @@ import { spawn, type IPty } from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { IPC } from '@shared/types'
 import type { TerminalDataPayload, TerminalExitPayload, TerminalId } from '@shared/types'
+import { prepareShellIntegration } from './shell-integration'
 
 const COALESCE_MS = 16
 const MAX_BUFFER_LINES = 10_000
@@ -29,12 +30,14 @@ export class PtyManager {
     if (this.entries.has(opts.id)) return
 
     const shell = opts.shell ?? process.env.SHELL ?? '/bin/zsh'
-    const pty = spawn(shell, [], {
+    const baseEnv = { ...process.env, TERM: 'xterm-256color' } as Record<string, string>
+    const { args, env } = prepareShellIntegration(shell, baseEnv)
+    const pty = spawn(shell, args, {
       name: 'xterm-256color',
       cols: opts.cols ?? 80,
       rows: opts.rows ?? 24,
       cwd: opts.cwd,
-      env: { ...process.env, TERM: 'xterm-256color' } as Record<string, string>,
+      env,
     })
 
     const entry: PtyEntry = {
@@ -88,6 +91,22 @@ export class PtyManager {
     } catch {
       // ignore
     }
+  }
+
+  /**
+   * Returns everything the PTY has emitted so far and cancels any pending flush.
+   * Pending chunks are already captured in `buffer`, so dropping the next flush
+   * prevents the renderer from receiving them twice once it subscribes.
+   */
+  attach(id: TerminalId): string {
+    const entry = this.entries.get(id)
+    if (!entry) return ''
+    if (entry.flushTimer !== null) {
+      clearTimeout(entry.flushTimer)
+      entry.flushTimer = null
+    }
+    entry.pendingData = []
+    return entry.buffer.join('')
   }
 
   disposeAll(): void {

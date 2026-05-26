@@ -1,4 +1,6 @@
-# Terminal Workspace
+<p align="center">
+  <img src="resources/wordmark.svg" alt="wTerm" width="540" />
+</p>
 
 A desktop IDE for working with multiple projects and multiple long-running terminals from a single window. Built for agent CLI workflows — `claude`, `aider`, dev servers, test watchers — but it works fine as a general terminal multiplexer too.
 
@@ -49,7 +51,7 @@ src/
 └── shared/types.ts                Shared types + IPC channel names
 ```
 
-State lives at `~/Library/Application Support/terminal-workspace/state.json`. Writes are debounced (500ms) and atomic (tmp + rename). `before-quit` flushes any pending save before `app.exit()`.
+State lives at `~/Library/Application Support/wTerm/state.json`. Writes are debounced (500ms) and atomic (tmp + rename). `before-quit` flushes any pending save before `app.exit()`.
 
 All terminals across all projects stay mounted as absolutely-positioned siblings; only the one matching `(selectedProject, activeTerminalInThatProject)` is visible. This is how scrollback survives navigation — `xterm.js` instances aren't torn down when you switch.
 
@@ -71,10 +73,10 @@ If `pnpm install` doesn't download the Electron binary (rare pnpm-10 quirk), run
 
 ```bash
 pnpm dist:mac
-open release/0.1.0/Terminal-Workspace-0.1.0-arm64.dmg
+open release/0.1.0/wTerm-0.1.0-arm64.dmg
 ```
 
-Drag **Terminal Workspace** to **Applications**. First launch: right-click the app → **Open** → **Open** in the dialog (the app is signed with a personal self-signed certificate, so Gatekeeper doesn't recognize the authority and asks once). After that it launches normally and macOS treats it as a known app for permission persistence.
+Drag **wTerm** to **Applications**. First launch: right-click the app → **Open** → **Open** in the dialog (the app is signed with a personal self-signed certificate, so Gatekeeper doesn't recognize the authority and asks once). After that it launches normally and macOS treats it as a known app for permission persistence.
 
 The build is signed with a local self-signed identity (`Dieu-Donne Nazzah (Personal)`) held in the developer's login Keychain. Anyone else cloning this repo to build will need to either remove `build.mac.identity` from `package.json` or substitute their own.
 

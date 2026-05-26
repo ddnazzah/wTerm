@@ -1,0 +1,65 @@
+/* Unlayered so it wins over heroui's `@layer base { .dark, [data-theme=dark] { --background: ... } }`.
+   Pinning --background here means terminal-host, bg-background, file viewer,
+   and code editor all share the same surface tone. */
+[data-theme='dark'] {
+  --background: #0b0b0f;
+}
+
+@layer base {
+  /* Default theme keeps the neutral look: accent renders as foreground. */
+  [data-theme='dark'] {
+    --accent: var(--foreground);
+    --accent-foreground: var(--eclipse);
+    --focus: var(--accent);
+  }
+
+  [data-theme='mint'] {
+    color-scheme: dark;
+
+    --background: oklch(0.155 0.004 270);
+    --foreground: var(--snow);
+
+    --surface: oklch(0.215 0.004 270);
+    --surface-foreground: var(--foreground);
+    --surface-secondary: oklch(0.255 0.004 270);
+    --surface-tertiary: oklch(0.295 0.004 270);
+
+    --overlay: oklch(0.235 0.004 270);
+    --overlay-foreground: var(--foreground);
+
+    --muted: oklch(0.72 0.012 270);
+    --scrollbar: oklch(0.72 0.012 270);
+
+    --default: oklch(0.275 0.004 270);
+    --default-foreground: var(--snow);
+
+    --field-background: oklch(0.215 0.004 270);
+    --field-foreground: var(--foreground);
+    --field-placeholder: var(--muted);
+    --field-border: transparent;
+
+    --accent: oklch(0.86 0.135 162);
+    --accent-foreground: oklch(0.18 0.01 270);
+
+    --success: oklch(0.86 0.135 162);
+    --success-foreground: oklch(0.18 0.01 270);
+    --warning: oklch(0.8203 0.1388 76.34);
+    --warning-foreground: var(--eclipse);
+    --danger: oklch(0.62 0.21 25);
+    --danger-foreground: var(--snow);
+
+    --segment: oklch(0.305 0.005 270);
+    --segment-foreground: var(--foreground);
+
+    --border: oklch(0.27 0.005 270);
+    --separator: oklch(0.235 0.004 270);
+    --focus: var(--accent);
+    --link: var(--accent);
+
+    --backdrop: rgba(0, 0, 0, 0.6);
+
+    --surface-shadow: 0 0 0 0 transparent inset;
+    --overlay-shadow: 0 0 1px 0 rgba(255, 255, 255, 0.25) inset;
+    --field-shadow: 0 0 0 0 transparent inset;
+  }
+}

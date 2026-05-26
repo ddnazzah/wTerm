@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Terminal Workspace</title>
+    <title>wTerm</title>
+    <script>
+      try {
+        var t = localStorage.getItem('tw:theme')
+        if (t === 'mint' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t)
+        }
+      } catch (_) {}
+    </script>
   </head>
   <body class="bg-background text-foreground antialiased">
     <div id="root"></div>

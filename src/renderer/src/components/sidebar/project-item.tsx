@@ -38,6 +38,8 @@ export function ProjectItem({
   const toggleExpanded = useWorkspace((s) => s.toggleProjectExpanded)
   const setExpanded = useWorkspace((s) => s.setProjectExpanded)
   const unreadByTerminal = useWorkspace((s) => s.unreadByTerminal)
+  const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
+  const busyByTerminal = useWorkspace((s) => s.busyByTerminal)
 
   const { activeId, create, close, rename: renameTerminal, setActive } = useTerminals(project)
 
@@ -96,7 +98,7 @@ export function ProjectItem({
         className={[
           'group/proj relative flex items-center gap-1.5 pl-1.5 pr-1 py-1.5 rounded-lg cursor-pointer transition-colors',
           selected
-            ? 'bg-foreground/10 text-foreground'
+            ? 'bg-accent/12 text-foreground'
             : 'text-foreground/75 hover:bg-foreground/5 hover:text-foreground',
         ].join(' ')}
         title={project.path}
@@ -200,13 +202,15 @@ export function ProjectItem({
       </div>
 
       {expanded && (
-        <div className="ml-3 mt-0.5 mb-1 pl-2 border-l border-foreground/10 flex flex-col gap-0.5">
+        <div className="ml-3 mt-0.5 mb-1 pl-2 border-l border-accent/14 flex flex-col gap-0.5">
           {project.terminals.map((t) => (
             <TerminalSidebarItem
               key={t.id}
               terminal={t}
               active={selected && t.id === activeId}
               unread={(unreadByTerminal[t.id] ?? 0) > 0}
+              busy={!!busyByTerminal[t.id]}
+              autoTitle={titleByTerminal[t.id]}
               onSelect={() => {
                 if (!selected) onSelect()
                 setActive(t.id)

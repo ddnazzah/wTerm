@@ -1,16 +1,27 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import {
   IPC,
   type AppState,
+  type CreatePullRequestInput,
   type CreateTerminalOptions,
+  type DeviceFlowPoll,
+  type DeviceFlowStart,
   type FocusTerminalPayload,
+  type FsEntry,
+  type GitInfo,
+  type GitHubSettings,
   type NotifyPayload,
   type Project,
   type ProjectId,
+  type PullRequestDetail,
+  type PullRequestSummary,
   type TerminalDataPayload,
   type TerminalExitPayload,
   type TerminalId,
   type TerminalRecord,
+  type WorkflowRunDetail,
+  type WorkflowRunSummary,
+  type WorkflowSummary,
 } from '@shared/types'
 
 const api = {
@@ -32,6 +43,8 @@ const api = {
   terminals: {
     create: (opts: CreateTerminalOptions): Promise<TerminalRecord | null> =>
       ipcRenderer.invoke(IPC.terminals.create, opts),
+    attach: (id: string): Promise<string> =>
+      ipcRenderer.invoke(IPC.terminals.attach, id),
     write: (id: string, data: string): Promise<void> =>
       ipcRenderer.invoke(IPC.terminals.write, id, data),
     resize: (id: string, cols: number, rows: number): Promise<void> =>
@@ -64,11 +77,95 @@ const api = {
   system: {
     notify: (payload: NotifyPayload): Promise<void> =>
       ipcRenderer.invoke(IPC.system.notify, payload),
+    openExternal: (url: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.system.openExternal, url),
     onFocusTerminal: (cb: (payload: FocusTerminalPayload) => void): (() => void) => {
       const listener = (_: unknown, payload: FocusTerminalPayload) => cb(payload)
       ipcRenderer.on(IPC.system.focusTerminal, listener)
       return () => ipcRenderer.off(IPC.system.focusTerminal, listener)
     },
+  },
+  fs: {
+    list: (projectId: ProjectId, relPath: string): Promise<FsEntry[]> =>
+      ipcRenderer.invoke(IPC.fs.list, projectId, relPath),
+    readText: (projectId: ProjectId, relPath: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.fs.readText, projectId, relPath),
+    writeText: (projectId: ProjectId, relPath: string, content: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.writeText, projectId, relPath, content),
+    createFile: (projectId: ProjectId, relPath: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.createFile, projectId, relPath),
+    createFolder: (projectId: ProjectId, relPath: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.createFolder, projectId, relPath),
+    rename: (projectId: ProjectId, from: string, to: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.rename, projectId, from, to),
+    remove: (projectId: ProjectId, relPath: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.remove, projectId, relPath),
+    open: (projectId: ProjectId, relPath: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.fs.open, projectId, relPath),
+    reveal: (projectId: ProjectId, relPath: string): Promise<void> =>
+      ipcRenderer.invoke(IPC.fs.reveal, projectId, relPath),
+    saveTempPaste: (data: Uint8Array, ext: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.fs.saveTempPaste, data, ext),
+    pathForFile: (file: File): string => webUtils.getPathForFile(file),
+  },
+  git: {
+    info: (projectId: ProjectId): Promise<GitInfo> =>
+      ipcRenderer.invoke(IPC.git.info, projectId),
+    push: (projectId: ProjectId, branch: string): Promise<{ ok: boolean; output: string }> =>
+      ipcRenderer.invoke(IPC.git.push, projectId, branch),
+  },
+  github: {
+    getSettings: (): Promise<GitHubSettings> => ipcRenderer.invoke(IPC.github.getSettings),
+    setClientId: (clientId: string | null): Promise<GitHubSettings> =>
+      ipcRenderer.invoke(IPC.github.setClientId, clientId),
+    setToken: (token: string): Promise<GitHubSettings> =>
+      ipcRenderer.invoke(IPC.github.setToken, token),
+    signOut: (): Promise<GitHubSettings> => ipcRenderer.invoke(IPC.github.signOut),
+    deviceStart: (): Promise<DeviceFlowStart> => ipcRenderer.invoke(IPC.github.deviceStart),
+    devicePoll: (deviceCode: string): Promise<DeviceFlowPoll> =>
+      ipcRenderer.invoke(IPC.github.devicePoll, deviceCode),
+    listPullRequests: (
+      projectId: ProjectId,
+      state: 'open' | 'closed' | 'all' = 'open'
+    ): Promise<PullRequestSummary[]> =>
+      ipcRenderer.invoke(IPC.github.listPullRequests, projectId, state),
+    getPullRequest: (projectId: ProjectId, number: number): Promise<PullRequestDetail | null> =>
+      ipcRenderer.invoke(IPC.github.getPullRequest, projectId, number),
+    createPullRequest: (input: CreatePullRequestInput): Promise<PullRequestSummary> =>
+      ipcRenderer.invoke(IPC.github.createPullRequest, input),
+    mergePullRequest: (
+      projectId: ProjectId,
+      number: number,
+      method: 'merge' | 'squash' | 'rebase'
+    ): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.mergePullRequest, projectId, number, method),
+    commentPullRequest: (
+      projectId: ProjectId,
+      number: number,
+      body: string
+    ): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.commentPullRequest, projectId, number, body),
+    listWorkflows: (projectId: ProjectId): Promise<WorkflowSummary[]> =>
+      ipcRenderer.invoke(IPC.github.listWorkflows, projectId),
+    listRuns: (
+      projectId: ProjectId,
+      opts?: { branch?: string }
+    ): Promise<WorkflowRunSummary[]> => ipcRenderer.invoke(IPC.github.listRuns, projectId, opts),
+    getRun: (projectId: ProjectId, runId: number): Promise<WorkflowRunDetail | null> =>
+      ipcRenderer.invoke(IPC.github.getRun, projectId, runId),
+    rerunRun: (projectId: ProjectId, runId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.rerunRun, projectId, runId),
+    rerunFailed: (projectId: ProjectId, runId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.rerunFailed, projectId, runId),
+    cancelRun: (projectId: ProjectId, runId: number): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.cancelRun, projectId, runId),
+    dispatchWorkflow: (
+      projectId: ProjectId,
+      workflowId: number,
+      ref: string,
+      inputs?: Record<string, string>
+    ): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke(IPC.github.dispatchWorkflow, projectId, workflowId, ref, inputs),
   },
 }
 
