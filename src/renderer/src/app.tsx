@@ -7,14 +7,17 @@ import { EmptyState } from './components/workspace/empty-state'
 import { FileViewer } from './components/workspace/file-viewer'
 import { FileTabs } from './components/workspace/file-tabs'
 import { SettingsModal } from './components/settings-modal'
+import { ConfirmDialog } from './components/confirm-dialog'
 import { useProjects } from './hooks/use-projects'
-import { createProjectTerminal, useWorkspace } from './state/store'
+import { closeProjectTerminal, createProjectTerminal, useWorkspace } from './state/store'
 import { isMac, isWindows, kbd } from './lib/platform'
 import type { Project, TerminalRecord } from '@shared/types'
 
 export default function App() {
   const { projects, selectedProject, addProject } = useProjects()
-  const removeTerminalLocal = useWorkspace((s) => s.removeTerminalLocal)
+  const requestTerminalClose = useWorkspace((s) => s.requestTerminalClose)
+  const pendingTerminalClose = useWorkspace((s) => s.pendingTerminalClose)
+  const clearPendingTerminalClose = useWorkspace((s) => s.clearPendingTerminalClose)
   const activeTerminalByProject = useWorkspace((s) => s.activeTerminalByProject)
   const selectProject = useWorkspace((s) => s.selectProject)
   const setActiveTerminal = useWorkspace((s) => s.setActiveTerminal)
@@ -75,6 +78,15 @@ export default function App() {
     [projects]
   )
 
+  const pendingCloseName = useMemo(() => {
+    if (!pendingTerminalClose) return null
+    const term = projects
+      .find((p) => p.id === pendingTerminalClose.projectId)
+      ?.terminals.find((t) => t.id === pendingTerminalClose.terminalId)
+    if (!term) return ''
+    return titleByTerminal[term.id] || term.name
+  }, [pendingTerminalClose, projects, titleByTerminal])
+
   useEffect(() => {
     const offExit = window.api.terminals.onExit(({ id }) => {
       void id
@@ -131,16 +143,14 @@ export default function App() {
         void createProjectTerminal(selectedProject.id)
       } else if (e.key === 'w' && activeTerminalId) {
         e.preventDefault()
-        void window.api.terminals.kill(activeTerminalId)
-        window.api.terminals.removeRecord(selectedProject.id, activeTerminalId)
-        removeTerminalLocal(selectedProject.id, activeTerminalId)
+        requestTerminalClose(selectedProject.id, activeTerminalId)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [
     selectedProject,
-    removeTerminalLocal,
+    requestTerminalClose,
     activeTerminalId,
     toggleSidebar,
     toggleRightSidebar,
@@ -303,6 +313,32 @@ export default function App() {
         panelDisabled={!selectedProject}
       />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ConfirmDialog
+        open={!!pendingTerminalClose}
+        title="Close terminal?"
+        message={
+          pendingCloseName ? (
+            <>
+              Close <span className="text-foreground/90 font-medium">{pendingCloseName}</span>? This
+              ends the shell and any running process.
+            </>
+          ) : (
+            'This ends the shell and any running process.'
+          )
+        }
+        confirmLabel="Close"
+        danger
+        onConfirm={() => {
+          if (pendingTerminalClose) {
+            void closeProjectTerminal(
+              pendingTerminalClose.projectId,
+              pendingTerminalClose.terminalId
+            )
+          }
+          clearPendingTerminalClose()
+        }}
+        onCancel={clearPendingTerminalClose}
+      />
     </div>
   )
 }

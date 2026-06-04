@@ -110,6 +110,8 @@ interface WorkspaceState {
   unreadByTerminal: Record<TerminalId, number>
   titleByTerminal: Record<TerminalId, string>
   busyByTerminal: Record<TerminalId, boolean>
+  /** Terminal awaiting close confirmation; null = no dialog open. */
+  pendingTerminalClose: { projectId: ProjectId; terminalId: TerminalId } | null
 
   sidebarWidth: number
   sidebarCollapsed: boolean
@@ -167,6 +169,9 @@ interface WorkspaceState {
   setTerminalTitle: (terminalId: TerminalId, title: string) => void
 
   setTerminalBusy: (terminalId: TerminalId, busy: boolean) => void
+
+  requestTerminalClose: (projectId: ProjectId, terminalId: TerminalId) => void
+  clearPendingTerminalClose: () => void
 }
 
 export const useWorkspace = create<WorkspaceState>((set) => ({
@@ -177,6 +182,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   unreadByTerminal: {},
   titleByTerminal: {},
   busyByTerminal: {},
+  pendingTerminalClose: null,
 
   sidebarWidth: readInitialSidebarWidth(),
   sidebarCollapsed: readInitialSidebarCollapsed(),
@@ -527,6 +533,11 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       }
       return { busyByTerminal: { ...state.busyByTerminal, [terminalId]: true } }
     }),
+
+  requestTerminalClose: (projectId, terminalId) =>
+    set({ pendingTerminalClose: { projectId, terminalId } }),
+
+  clearPendingTerminalClose: () => set({ pendingTerminalClose: null }),
 }))
 
 /**
@@ -536,10 +547,32 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
  */
 export async function createProjectTerminal(
   projectId: ProjectId,
-  opts?: { cwd?: string; name?: string }
+  opts?: { cwd?: string; name?: string; startupCommand?: string }
 ): Promise<TerminalRecord | null> {
-  const startupCommand = useSettings.getState().terminal.startupCommand.trim() || undefined
-  const record = await window.api.terminals.create({ projectId, startupCommand, ...opts })
+  // An explicit startup command (e.g. the Claude Code menu items) takes
+  // precedence over the global Settings → Terminal startup command.
+  const startupCommand =
+    opts?.startupCommand ?? (useSettings.getState().terminal.startupCommand.trim() || undefined)
+  const record = await window.api.terminals.create({
+    projectId,
+    startupCommand,
+    cwd: opts?.cwd,
+    name: opts?.name,
+  })
   if (record) useWorkspace.getState().addTerminal(projectId, record)
   return record
+}
+
+/**
+ * Kill a terminal and drop its record everywhere. The single funnel for the
+ * actual close — mirrors {@link createProjectTerminal}. Safe to call when the
+ * terminal is already gone (`removeTerminalLocal` guards a missing terminal).
+ */
+export async function closeProjectTerminal(
+  projectId: ProjectId,
+  terminalId: TerminalId
+): Promise<void> {
+  await window.api.terminals.kill(terminalId)
+  window.api.terminals.removeRecord(projectId, terminalId)
+  useWorkspace.getState().removeTerminalLocal(projectId, terminalId)
 }
