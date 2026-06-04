@@ -105,6 +105,8 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
+          # Recursive globs: upload-artifact preserves the release/<version>/
+          # subdir, so the files land under artifacts/<version>/.
           files: |
-            artifacts/wTerm-*-arm64.dmg
-            artifacts/wTerm-*-x64-setup.exe
+            artifacts/**/wTerm-*-arm64.dmg
+            artifacts/**/wTerm-*-x64-setup.exe
