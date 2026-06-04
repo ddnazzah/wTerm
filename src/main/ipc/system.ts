@@ -18,11 +18,47 @@ function notifyViaOsascript(title: string, body: string): void {
   spawn('osascript', ['-e', script], { detached: true, stdio: 'ignore' }).unref()
 }
 
+/**
+ * Open a standalone OS terminal window rooted at `dir`. Each platform gets its
+ * native default: iTerm on macOS, Windows Terminal (falling back to a PowerShell
+ * window) on Windows, and a best-effort sweep of the common emulators on Linux.
+ */
+function openExternalTerminal(dir: string): void {
+  if (process.platform === 'darwin') {
+    spawn('open', ['-a', 'iTerm', dir], { detached: true, stdio: 'ignore' }).unref()
+    return
+  }
+  if (process.platform === 'win32') {
+    // Prefer Windows Terminal; if it isn't installed, `wt.exe` fails to spawn and
+    // we fall back to launching a standalone PowerShell window via cmd's `start`.
+    const wt = spawn('wt.exe', ['-d', dir], { detached: true, stdio: 'ignore' })
+    wt.on('error', () => {
+      const psDir = dir.replace(/'/g, "''") // escape single quotes for PowerShell
+      spawn(
+        'cmd.exe',
+        ['/c', 'start', '', 'powershell.exe', '-NoExit', '-Command', `Set-Location -LiteralPath '${psDir}'`],
+        { detached: true, stdio: 'ignore' }
+      ).unref()
+    })
+    wt.unref()
+    return
+  }
+  // Linux: try the common terminal emulators in order until one launches.
+  const candidates = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xterm']
+  const tryNext = (i: number): void => {
+    if (i >= candidates.length) return
+    const child = spawn(candidates[i]!, { cwd: dir, detached: true, stdio: 'ignore' })
+    child.on('error', () => tryNext(i + 1))
+    child.unref()
+  }
+  tryNext(0)
+}
+
 export function registerSystemIpc(): void {
   ipcMain.handle(IPC.projects.openInITerm, (_e, id: ProjectId): void => {
     const project = getProject(id)
     if (!project) return
-    spawn('open', ['-a', 'iTerm', project.path], { detached: true, stdio: 'ignore' }).unref()
+    openExternalTerminal(project.path)
   })
 
   ipcMain.handle(IPC.projects.openInFinder, (_e, id: ProjectId): void => {

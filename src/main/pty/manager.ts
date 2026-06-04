@@ -2,7 +2,7 @@ import { spawn, type IPty } from 'node-pty'
 import { BrowserWindow } from 'electron'
 import { IPC } from '@shared/types'
 import type { TerminalDataPayload, TerminalExitPayload, TerminalId } from '@shared/types'
-import { prepareShellIntegration } from './shell-integration'
+import { getDefaultShell, prepareShellIntegration } from './shell-integration'
 
 const COALESCE_MS = 16
 const MAX_BUFFER_LINES = 10_000
@@ -38,7 +38,7 @@ export class PtyManager {
   }): void {
     if (this.entries.has(opts.id)) return
 
-    const shell = opts.shell ?? process.env.SHELL ?? '/bin/zsh'
+    const shell = opts.shell ?? getDefaultShell()
     const cols = opts.cols ?? 80
     const rows = opts.rows ?? 24
     // Advertise a modern terminal profile. Some TUIs gate richer behaviors

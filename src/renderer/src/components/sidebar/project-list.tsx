@@ -7,6 +7,7 @@ import {
   SIDEBAR_MIN_WIDTH,
   useWorkspace,
 } from '@renderer/state/store'
+import { isMac } from '@renderer/lib/platform'
 
 export function ProjectList() {
   const { projects, selectedProjectId, addProject, remove, rename, select, openInITerm, openInFinder } =
@@ -61,7 +62,7 @@ export function ProjectList() {
       className="relative flex flex-col h-full flex-shrink-0 border-r border-accent/14 bg-surface/40 backdrop-blur-sm"
       style={{ width: sidebarWidth, minWidth: SIDEBAR_MIN_WIDTH, maxWidth: SIDEBAR_MAX_WIDTH }}
     >
-      <header className="app-titlebar flex items-center h-11 px-3 pl-20 border-b border-accent/14">
+      <header className={`app-titlebar flex items-center h-11 px-3 ${isMac ? 'pl-20' : ''} border-b border-accent/14`}>
         <span className="text-[11px] uppercase tracking-wider text-foreground/40 font-medium flex-1">
           Projects
         </span>

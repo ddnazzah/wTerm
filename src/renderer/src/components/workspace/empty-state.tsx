@@ -1,5 +1,6 @@
 import { Button } from '@heroui/react'
 import logoUrl from '../../../../../resources/logo.svg?url'
+import { kbd } from '@renderer/lib/platform'
 
 interface Props {
   hasSelection: boolean
@@ -35,7 +36,7 @@ export function EmptyState({ hasSelection, onCreateTerminal, onAddProject }: Pro
       <Button size="sm" onPress={() => onCreateTerminal?.()}>
         + New terminal
       </Button>
-      <div className="text-[11px] text-foreground/40">⌘T to open a new terminal</div>
+      <div className="text-[11px] text-foreground/40">{kbd('T')} to open a new terminal</div>
     </div>
   )
 }

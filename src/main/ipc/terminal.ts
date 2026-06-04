@@ -9,6 +9,7 @@ import {
   type TerminalRecord,
 } from '@shared/types'
 import { getProject, mutate, removeTerminal, upsertTerminal } from '../store/state'
+import { getDefaultShell } from '../pty/shell-integration'
 import type { PtyManager } from '../pty/manager'
 
 /** Resolve a project-relative cwd, refusing anything that escapes the project root. */
@@ -28,7 +29,7 @@ export function registerTerminalIpc(pty: PtyManager): void {
       if (!project) return null
 
       const id = randomUUID()
-      const shell = opts.shell ?? process.env.SHELL ?? '/bin/zsh'
+      const shell = opts.shell ?? getDefaultShell()
       const cwd = resolveCwd(project.path, opts.cwd)
       const record: TerminalRecord = {
         id,

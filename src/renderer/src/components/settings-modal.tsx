@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSettings, DEFAULTS } from '@renderer/state/settings'
+import { kbd } from '@renderer/lib/platform'
 
 interface Props {
   open: boolean
@@ -166,7 +167,7 @@ function FormattingSection() {
       />
       <p className="text-[12px] leading-relaxed text-foreground/55">
         Uses Prettier for JavaScript, TypeScript, JSON, CSS, HTML, Markdown, and YAML. Use{' '}
-        <kbd className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/80 text-[11px]">⌘⇧F</kbd> to
+        <kbd className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/80 text-[11px]">{kbd('F', { shift: true })}</kbd> to
         format the active file on demand.
       </p>
     </Section>
