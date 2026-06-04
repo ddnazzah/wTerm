@@ -1,4 +1,5 @@
 import { useWorkspace, type RightSidebarTab } from '@renderer/state/store'
+import { isWindows, kbd } from '@renderer/lib/platform'
 
 interface Props {
   onOpenSettings: () => void
@@ -30,7 +31,11 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
     !panelDisabled && !collapsed && tab === which
 
   return (
-    <aside className="app-titlebar flex flex-col items-center justify-between gap-1 py-2 w-11 flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm">
+    <aside
+      className={`app-titlebar flex flex-col items-center justify-between gap-1 py-2 ${
+        isWindows ? 'pt-12' : ''
+      } w-11 flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm`}
+    >
       <div className="flex flex-col items-center gap-1">
         <ActivityButton
           active={isActive('files')}
@@ -58,7 +63,7 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <ActivityButton onClick={onOpenSettings} label="Settings (⌘,)">
+        <ActivityButton onClick={onOpenSettings} label={`Settings (${kbd(',')})`}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />

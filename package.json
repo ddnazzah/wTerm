@@ -14,7 +14,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "rebuild": "electron-rebuild -f -w node-pty",
-    "postinstall": "electron-rebuild -f -w node-pty || true",
+    "postinstall": "electron-rebuild -f -w node-pty || exit 0",
     "build:icons": "node scripts/build-icons.mjs",
     "dist": "npm run build:icons && electron-vite build && electron-builder",
     "dist:mac": "npm run build:icons && electron-vite build && electron-builder --mac",

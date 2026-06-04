@@ -60,6 +60,21 @@ function detectShell(shellPath: string): ShellKind {
   return 'unknown'
 }
 
+/**
+ * The shell to launch when the caller doesn't specify one. On POSIX we honor
+ * $SHELL (the user's login shell) and fall back to zsh. On Windows there is no
+ * $SHELL convention — defaulting to it would try to spawn `/bin/zsh`, which
+ * doesn't exist — so we use PowerShell, which ships on every supported Windows
+ * version and is the better interactive experience than cmd.exe. node-pty
+ * resolves the bare name via PATH (System32 is always present there).
+ */
+export function getDefaultShell(): string {
+  if (process.platform === 'win32') {
+    return process.env.WTERM_SHELL || 'powershell.exe'
+  }
+  return process.env.SHELL || '/bin/zsh'
+}
+
 interface PreparedSpawn {
   args: string[]
   env: Record<string, string>

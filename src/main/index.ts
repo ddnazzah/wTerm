@@ -16,6 +16,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 app.setName('wTerm')
 
+// Windows attributes notifications (and taskbar grouping) by AppUserModelID. It
+// must match the NSIS installer's appId or toasts are silently dropped / shown
+// as "electron.exe". No-op / unnecessary on macOS.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.ddnazzah.wterm')
+}
+
 // Resolve the app icon in both dev (cwd = repo root) and packaged builds
 // (where Resources/icon.png is staged by electron-builder from buildResources).
 function resolveAppIcon(): string | undefined {
@@ -43,7 +50,19 @@ function createWindow(): void {
     minWidth: 800,
     minHeight: 500,
     show: false,
-    titleBarStyle: 'hiddenInset',
+    // macOS: inset traffic lights over the custom title bar. Windows/Linux have
+    // no traffic lights, so we hide the native frame and draw the OS window
+    // controls (minimize/maximize/close) as an overlay sized to our 44px header.
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    ...(process.platform !== 'darwin'
+      ? {
+          titleBarOverlay: {
+            color: '#0b0b0f',
+            symbolColor: '#e5e7eb',
+            height: 44,
+          },
+        }
+      : {}),
     backgroundColor: '#0b0b0f',
     icon: APP_ICON_PATH,
     webPreferences: {

@@ -3,7 +3,12 @@ import { Button, Dropdown, Label } from '@heroui/react'
 import type { Project } from '@shared/types'
 import { useWorkspace } from '@renderer/state/store'
 import { useTerminals } from '@renderer/hooks/use-terminals'
+import { isMac, isWindows } from '@renderer/lib/platform'
 import { TerminalSidebarItem } from './terminal-sidebar-item'
+
+// Per-platform names for the native terminal / file-manager apps.
+const TERMINAL_APP = isMac ? 'iTerm' : isWindows ? 'Terminal' : 'terminal'
+const FILE_MANAGER_APP = isMac ? 'Finder' : isWindows ? 'Explorer' : 'file manager'
 
 interface Props {
   project: Project
@@ -187,11 +192,11 @@ export function ProjectItem({
               <Dropdown.Item id={ACTIONS.rename} textValue="Rename">
                 <Label>Rename</Label>
               </Dropdown.Item>
-              <Dropdown.Item id={ACTIONS.finder} textValue="Open in Finder">
-                <Label>Open in Finder</Label>
+              <Dropdown.Item id={ACTIONS.finder} textValue={`Open in ${FILE_MANAGER_APP}`}>
+                <Label>Open in {FILE_MANAGER_APP}</Label>
               </Dropdown.Item>
-              <Dropdown.Item id={ACTIONS.iterm} textValue="Open in iTerm">
-                <Label>Open in iTerm</Label>
+              <Dropdown.Item id={ACTIONS.iterm} textValue={`Open in ${TERMINAL_APP}`}>
+                <Label>Open in {TERMINAL_APP}</Label>
               </Dropdown.Item>
               <Dropdown.Item id={ACTIONS.remove} textValue="Remove" variant="danger">
                 <Label>Remove</Label>

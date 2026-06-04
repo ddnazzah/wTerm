@@ -9,6 +9,7 @@ import { FileTabs } from './components/workspace/file-tabs'
 import { SettingsModal } from './components/settings-modal'
 import { useProjects } from './hooks/use-projects'
 import { createProjectTerminal, useWorkspace } from './state/store'
+import { isMac, isWindows, kbd } from './lib/platform'
 import type { Project, TerminalRecord } from '@shared/types'
 
 export default function App() {
@@ -183,21 +184,27 @@ export default function App() {
   const showEmptyNoProject = !selectedProject
   const showEmptyNoTerminals = !!selectedProject && selectedProject.terminals.length === 0
 
+  // When the right sidebar is hidden, the main header runs to the window's right
+  // edge — where the Windows window-controls overlay sits — so reserve room so
+  // tabs/content don't slide under the minimize/maximize/close buttons.
+  const rightSidebarVisible = !!selectedProject && !rightSidebarCollapsed
+  const titlebarRightGutter = isWindows && !rightSidebarVisible ? 'pr-[100px]' : ''
+
   return (
     <div className="flex h-screen w-screen bg-surface text-foreground">
       {!sidebarCollapsed && <ProjectList />}
       <main className="flex-1 flex flex-col min-w-0">
         <header
           className={`app-titlebar h-11 flex items-center gap-2 px-4 border-b border-accent/14 ${
-            sidebarCollapsed ? 'pl-20' : ''
-          }`}
+            sidebarCollapsed && isMac ? 'pl-20' : ''
+          } ${titlebarRightGutter}`}
         >
           {sidebarCollapsed && (
             <button
               type="button"
               onClick={toggleSidebar}
               aria-label="Show sidebar"
-              title="Show sidebar (⌘B)"
+              title={`Show sidebar (${kbd('B')})`}
               className="flex items-center justify-center w-6 h-6 -ml-1 rounded-md text-foreground/50 hover:text-foreground hover:bg-foreground/10 transition-colors"
             >
               <svg
