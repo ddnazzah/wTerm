@@ -40,20 +40,24 @@ for (const [size, name, useSmall] of slots) {
   process.stdout.write(`  ${useSmall ? 'small' : 'main '} → ${size.toString().padStart(4)}px  ${name}\n`)
 }
 
-// Bundle the iconset into a single .icns using the macOS iconutil tool.
-if (!existsSync('/usr/bin/iconutil')) {
-  console.error('iconutil not found — this script needs to run on macOS.')
-  process.exit(1)
-}
-execFileSync('/usr/bin/iconutil', ['-c', 'icns', iconsetDir, '-o', join(resourcesDir, 'icon.icns')])
-
-// Also emit a 1024×1024 PNG of the main variant for non-macOS / web use.
+// Always emit a 1024×1024 PNG of the main variant. macOS uses the .icns below;
+// Windows/Linux builds have electron-builder derive their icon from this PNG.
 const png1024 = new Resvg(mainSvg, { fitTo: { mode: 'width', value: 1024 } }).render().asPng()
 writeFileSync(join(resourcesDir, 'icon.png'), png1024)
 
-// Clean up the intermediate iconset directory once .icns is built.
+// Bundle the iconset into a single .icns using the macOS iconutil tool. This is
+// only needed for (and only available on) macOS — skip it elsewhere so the
+// script can run on Windows/Linux CI runners, which build from icon.png instead.
+const hasIconutil = existsSync('/usr/bin/iconutil')
+if (hasIconutil) {
+  execFileSync('/usr/bin/iconutil', ['-c', 'icns', iconsetDir, '-o', join(resourcesDir, 'icon.icns')])
+} else {
+  console.warn('iconutil not found (non-macOS) — skipping icon.icns; using icon.png for this platform.')
+}
+
+// Clean up the intermediate iconset directory.
 rmSync(iconsetDir, { recursive: true, force: true })
 
 console.log('\nwrote:')
-console.log('  resources/icon.icns')
-console.log('  resources/icon.png  (1024×1024 fallback)')
+if (hasIconutil) console.log('  resources/icon.icns')
+console.log('  resources/icon.png  (1024×1024)')
