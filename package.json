@@ -54,9 +54,9 @@
           ]
         }
       ],
-      "identity": "Dieu-Donne Nazzah (Personal)",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "notarize": true,
       "artifactName": "wTerm-${version}-${arch}.${ext}"
     },
     "dmg": {
