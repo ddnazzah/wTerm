@@ -16,32 +16,14 @@ A polish release for wTerm — a multi-project, multi-terminal workspace IDE —
 - **File viewer / file tree improvements** — refinements to the right-sidebar file tree and file viewer/editor.
 - **Terminal & PTY refinements** — stability and behavior improvements in the terminal pane and PTY manager.
 
-## macOS first-launch instructions
+## macOS install instructions
 
-The macOS build is signed with a personal self-signed certificate and is **not notarized by Apple**. Gatekeeper will block it on first launch with one of:
+The macOS build is signed with an Apple **Developer ID** certificate and **notarized by Apple**, so it opens normally — no Gatekeeper workarounds needed.
 
-- "wTerm can't be opened because Apple cannot check it for malicious software"
-- "wTerm is from an unidentified developer"
-- "wTerm is damaged and can't be opened"
+1. Open the DMG and drag **wTerm** to **Applications**.
+2. Launch it from Applications or Spotlight.
 
-### Option A — right-click Open (try this first)
-
-1. Drag **wTerm** to **Applications** from the DMG.
-2. In Finder, open **Applications**.
-3. **Right-click** (or Control-click) **wTerm** → **Open**.
-4. In the dialog, click **Open** again.
-
-You only need to do this once. macOS remembers the choice and future launches go straight through.
-
-### Option B — remove the quarantine flag (use if A doesn't work)
-
-If you see the "damaged and can't be opened" message, Option A won't work — clear the quarantine bit from Terminal:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/wTerm.app
-```
-
-Then launch normally from Applications or Spotlight.
+That's it — the first launch goes straight through.
 
 ## Windows first-launch instructions
 
