@@ -30,7 +30,7 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
     !panelDisabled && !collapsed && tab === which
 
   return (
-    <aside className="app-titlebar flex flex-col items-center justify-between gap-1 py-2 w-11 flex-shrink-0 border-l border-accent/14 bg-background/40 backdrop-blur-sm">
+    <aside className="app-titlebar flex flex-col items-center justify-between gap-1 py-2 w-11 flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-1">
         <ActivityButton
           active={isActive('files')}

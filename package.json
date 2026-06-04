@@ -1,6 +1,6 @@
 {
   "name": "wterm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Multi-project, multi-terminal workspace IDE",
   "main": "./out/main/index.js",
@@ -109,6 +109,8 @@
     "material-icon-theme": "^5.35.0",
     "node-pty": "^1.1.0",
     "prettier": "^3.8.3",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-variants": "^3.2.2",
     "uuid": "^14.0.0",
     "zustand": "^5.0.13"

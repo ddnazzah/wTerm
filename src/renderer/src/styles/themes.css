@@ -1,65 +1,81 @@
 /* Unlayered so it wins over heroui's `@layer base { .dark, [data-theme=dark] { --background: ... } }`.
-   Pinning --background here means terminal-host, bg-background, file viewer,
-   and code editor all share the same surface tone. */
-[data-theme='dark'] {
-  --background: #0b0b0f;
+   --background is the editor surface (terminal, code editor, file viewer).
+   --surface is the surrounding chrome (root, sidebars, titlebar) — kept darker
+   than --background so the editor area visually "lifts" out of the frame,
+   matching how VS Code / typical IDEs layer their chrome. */
+[data-theme='halcyon'] {
+  --background: #1d2433;
 }
 
 @layer base {
-  /* Default theme keeps the neutral look: accent renders as foreground. */
-  [data-theme='dark'] {
-    --accent: var(--foreground);
-    --accent-foreground: var(--eclipse);
-    --focus: var(--accent);
-  }
-
-  [data-theme='mint'] {
+  /* Halcyon — port of bchiang7/halcyon-vscode.
+     Deep navy chrome (#171c28), slightly lighter editor surface (#1d2433),
+     muted blue-gray foreground (#a2aabc), yellow accent (#ffcc66). */
+  [data-theme='halcyon'] {
     color-scheme: dark;
 
-    --background: oklch(0.155 0.004 270);
-    --foreground: var(--snow);
+    --foreground: #a2aabc;
 
-    --surface: oklch(0.215 0.004 270);
+    --surface: #171c28;
     --surface-foreground: var(--foreground);
-    --surface-secondary: oklch(0.255 0.004 270);
-    --surface-tertiary: oklch(0.295 0.004 270);
+    --surface-secondary: #1d2433;
+    --surface-tertiary: #2f3b54;
 
-    --overlay: oklch(0.235 0.004 270);
+    --overlay: #1d2433;
     --overlay-foreground: var(--foreground);
 
-    --muted: oklch(0.72 0.012 270);
-    --scrollbar: oklch(0.72 0.012 270);
+    --muted: #5c6773;
+    --scrollbar: #96a6cc;
 
-    --default: oklch(0.275 0.004 270);
-    --default-foreground: var(--snow);
+    --default: #2f3b54;
+    --default-foreground: var(--foreground);
 
-    --field-background: oklch(0.215 0.004 270);
+    --field-background: #1d2433;
     --field-foreground: var(--foreground);
     --field-placeholder: var(--muted);
-    --field-border: transparent;
+    --field-border: #96a6cc33;
 
-    --accent: oklch(0.86 0.135 162);
-    --accent-foreground: oklch(0.18 0.01 270);
+    --accent: #ffcc66;
+    --accent-foreground: #171c28;
 
-    --success: oklch(0.86 0.135 162);
-    --success-foreground: oklch(0.18 0.01 270);
-    --warning: oklch(0.8203 0.1388 76.34);
-    --warning-foreground: var(--eclipse);
-    --danger: oklch(0.62 0.21 25);
-    --danger-foreground: var(--snow);
+    --success: #bae67e;
+    --success-foreground: #171c28;
+    --warning: #ffcc66;
+    --warning-foreground: #171c28;
+    --danger: #ef6b73;
+    --danger-foreground: #171c28;
 
-    --segment: oklch(0.305 0.005 270);
+    --segment: #2f3b54;
     --segment-foreground: var(--foreground);
 
-    --border: oklch(0.27 0.005 270);
-    --separator: oklch(0.235 0.004 270);
+    --border: #2f3b54;
+    --separator: #2f3b54;
     --focus: var(--accent);
-    --link: var(--accent);
+    --link: #5ccfe6;
 
     --backdrop: rgba(0, 0, 0, 0.6);
 
     --surface-shadow: 0 0 0 0 transparent inset;
-    --overlay-shadow: 0 0 1px 0 rgba(255, 255, 255, 0.25) inset;
+    --overlay-shadow: 0 0 1px 0 rgba(255, 255, 255, 0.15) inset;
     --field-shadow: 0 0 0 0 transparent inset;
+
+    --terminal-cursor: #ffcc66;
+    --terminal-selection: rgba(255, 204, 102, 0.3);
+    --ansi-black: #2f3b54;
+    --ansi-red: #ef6b73;
+    --ansi-green: #bae67e;
+    --ansi-yellow: #ffcc66;
+    --ansi-blue: #5ccfe6;
+    --ansi-magenta: #c3a6ff;
+    --ansi-cyan: #5ccfe6;
+    --ansi-white: #a2aabc;
+    --ansi-bright-black: #444a5e;
+    --ansi-bright-red: #ef6b73;
+    --ansi-bright-green: #bae67e;
+    --ansi-bright-yellow: #ffcc66;
+    --ansi-bright-blue: #5ccfe6;
+    --ansi-bright-magenta: #c3a6ff;
+    --ansi-bright-cyan: #5ccfe6;
+    --ansi-bright-white: #a2aabc;
   }
 }

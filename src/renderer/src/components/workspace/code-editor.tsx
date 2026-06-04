@@ -31,6 +31,8 @@ import {
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { languageExtensionFor } from '@renderer/lib/code-mirror-language'
+import { halcyonTheme } from '@renderer/lib/codemirror-halcyon-theme'
+import { useTheme, type ThemeName } from '@renderer/lib/theme'
 import { useSettings, type EditorSettings } from '@renderer/state/settings'
 
 interface Props {
@@ -71,6 +73,12 @@ export function CodeEditor({
   const settingsRef = useRef(settings)
   useEffect(() => {
     settingsRef.current = settings
+  })
+
+  const { theme } = useTheme()
+  const themeRef = useRef(theme)
+  useEffect(() => {
+    themeRef.current = theme
   })
 
   // Compartments for everything that can change without recreating the view.
@@ -156,7 +164,7 @@ export function CodeEditor({
       EditorView.updateListener.of((v) => {
         if (v.docChanged) onChangeRef.current(v.state.doc.toString())
       }),
-      themeCompartment.current.of(oneDark),
+      themeCompartment.current.of(themeExtFor(themeRef.current)),
       styleCompartment.current.of(styleExt),
     ]
     if (readOnly) extensions.push(EditorState.readOnly.of(true))
@@ -176,7 +184,7 @@ export function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filename, readOnly])
 
-  // Reactively re-configure compartments when settings change.
+  // Reactively re-configure compartments when settings or theme change.
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
@@ -191,6 +199,7 @@ export function CodeEditor({
           EditorState.tabSize.of(settings.tabSize),
           indentUnit.of(settings.insertSpaces ? ' '.repeat(settings.tabSize) : '\t'),
         ]),
+        themeCompartment.current.reconfigure(themeExtFor(theme)),
       ],
     })
   }, [
@@ -201,9 +210,14 @@ export function CodeEditor({
     settings.tabSize,
     settings.insertSpaces,
     settings,
+    theme,
   ])
 
   return <div ref={hostRef} className="h-full w-full overflow-hidden" />
+}
+
+function themeExtFor(theme: ThemeName): Extension {
+  return theme === 'halcyon' ? halcyonTheme : oneDark
 }
 
 function makeStyleExt(s: EditorSettings): Extension {

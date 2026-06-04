@@ -58,7 +58,7 @@ export function ProjectList() {
 
   return (
     <aside
-      className="relative flex flex-col h-full flex-shrink-0 border-r border-accent/14 bg-background/40 backdrop-blur-sm"
+      className="relative flex flex-col h-full flex-shrink-0 border-r border-accent/14 bg-surface/40 backdrop-blur-sm"
       style={{ width: sidebarWidth, minWidth: SIDEBAR_MIN_WIDTH, maxWidth: SIDEBAR_MAX_WIDTH }}
     >
       <header className="app-titlebar flex items-center h-11 px-3 pl-20 border-b border-accent/14">

@@ -8,12 +8,11 @@ import { FileViewer } from './components/workspace/file-viewer'
 import { FileTabs } from './components/workspace/file-tabs'
 import { SettingsModal } from './components/settings-modal'
 import { useProjects } from './hooks/use-projects'
-import { useWorkspace } from './state/store'
+import { createProjectTerminal, useWorkspace } from './state/store'
 import type { Project, TerminalRecord } from '@shared/types'
 
 export default function App() {
   const { projects, selectedProject, addProject } = useProjects()
-  const addTerminal = useWorkspace((s) => s.addTerminal)
   const removeTerminalLocal = useWorkspace((s) => s.removeTerminalLocal)
   const activeTerminalByProject = useWorkspace((s) => s.activeTerminalByProject)
   const selectProject = useWorkspace((s) => s.selectProject)
@@ -128,9 +127,7 @@ export default function App() {
 
       if (e.key === 't') {
         e.preventDefault()
-        void window.api.terminals.create({ projectId: selectedProject.id }).then((rec) => {
-          if (rec) addTerminal(selectedProject.id, rec)
-        })
+        void createProjectTerminal(selectedProject.id)
       } else if (e.key === 'w' && activeTerminalId) {
         e.preventDefault()
         void window.api.terminals.kill(activeTerminalId)
@@ -142,7 +139,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     selectedProject,
-    addTerminal,
     removeTerminalLocal,
     activeTerminalId,
     toggleSidebar,
@@ -188,7 +184,7 @@ export default function App() {
   const showEmptyNoTerminals = !!selectedProject && selectedProject.terminals.length === 0
 
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground">
+    <div className="flex h-screen w-screen bg-surface text-foreground">
       {!sidebarCollapsed && <ProjectList />}
       <main className="flex-1 flex flex-col min-w-0">
         <header
@@ -265,9 +261,7 @@ export default function App() {
                 hasSelection
                 onCreateTerminal={() => {
                   if (!selectedProject) return
-                  void window.api.terminals.create({ projectId: selectedProject.id }).then((rec) => {
-                    if (rec) addTerminal(selectedProject.id, rec)
-                  })
+                  void createProjectTerminal(selectedProject.id)
                 }}
               />
             )}

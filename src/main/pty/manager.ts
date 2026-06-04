@@ -13,6 +13,8 @@ interface PtyEntry {
   pendingData: string[]
   flushTimer: NodeJS.Timeout | null
   buffer: string[]
+  /** Command to inject once, after the shell emits its first output; null once sent. */
+  startupCommand: string | null
 }
 
 export class PtyManager {
@@ -26,19 +28,54 @@ export class PtyManager {
     })
   }
 
-  create(opts: { id: TerminalId; cwd: string; shell?: string; cols?: number; rows?: number }): void {
+  create(opts: {
+    id: TerminalId
+    cwd: string
+    shell?: string
+    cols?: number
+    rows?: number
+    startupCommand?: string
+  }): void {
     if (this.entries.has(opts.id)) return
 
     const shell = opts.shell ?? process.env.SHELL ?? '/bin/zsh'
-    const baseEnv = { ...process.env, TERM: 'xterm-256color' } as Record<string, string>
-    const { args, env } = prepareShellIntegration(shell, baseEnv)
-    const pty = spawn(shell, args, {
+    const cols = opts.cols ?? 80
+    const rows = opts.rows ?? 24
+    // Advertise a modern terminal profile. Some TUIs gate richer behaviors
+    // (OSC 9;4 taskbar progress, escape-sequence desktop notifications) on a
+    // recognized TERM_PROGRAM and fall back to a capability-poor mode without
+    // one. NB: Claude Code 2.x does NOT use these — it reports its working state
+    // through the window-title spinner, which is what actually drives wTerm's
+    // busy indicator (see terminal-pane.tsx). This just keeps us on the capable
+    // path for other programs. TERM is xterm-256color — wTerm's xterm.js front
+    // end supports 256 colors + truecolor (terminfo for it is universally
+    // present), so programs get full color with no multiplexer in between.
+    const baseEnv = {
+      ...process.env,
+      TERM: 'xterm-256color',
+      TERM_PROGRAM: 'ghostty',
+      TERM_PROGRAM_VERSION: '1.1.0',
+    } as Record<string, string>
+    const { args: shellArgs, env: preparedEnv } = prepareShellIntegration(shell, baseEnv)
+
+    // Spawn the shell directly. Terminals don't persist across an app restart —
+    // they're recreated fresh from saved state (see store/state.ts), which keeps
+    // the terminal's behavior native (no TERM override, mouse capture, or
+    // alternate-screen quirks that a multiplexer layer would introduce).
+    const pty = spawn(shell, shellArgs, {
       name: 'xterm-256color',
-      cols: opts.cols ?? 80,
-      rows: opts.rows ?? 24,
+      cols,
+      rows,
       cwd: opts.cwd,
-      env,
+      env: preparedEnv,
     })
+
+    // Normalize the startup script into something a shell will run: newlines
+    // become carriage returns (Enter) and a trailing CR makes the last line fire.
+    const rawStartup = opts.startupCommand?.trim() ?? ''
+    const startupCommand = rawStartup
+      ? rawStartup.replace(/\r?\n/g, '\r') + '\r'
+      : null
 
     const entry: PtyEntry = {
       id: opts.id,
@@ -46,6 +83,7 @@ export class PtyManager {
       pendingData: [],
       flushTimer: null,
       buffer: [],
+      startupCommand,
     }
     this.entries.set(opts.id, entry)
 
@@ -58,6 +96,20 @@ export class PtyManager {
       if (entry.flushTimer === null) {
         entry.flushTimer = setTimeout(() => this.flush(entry), COALESCE_MS)
       }
+      // Inject the configured startup command once the shell is alive (its first
+      // output means the prompt/rc has loaded). A short delay lets the prompt
+      // finish rendering so the typed command lands cleanly after it.
+      if (entry.startupCommand !== null) {
+        const cmd = entry.startupCommand
+        entry.startupCommand = null
+        setTimeout(() => {
+          try {
+            entry.pty.write(cmd)
+          } catch {
+            // pty may have exited before the delay elapsed — ignore
+          }
+        }, 150)
+      }
     })
 
     pty.onExit(({ exitCode, signal }) => {
@@ -66,6 +118,10 @@ export class PtyManager {
       const payload: TerminalExitPayload = { id: opts.id, exitCode, signal }
       this.window?.webContents.send(IPC.terminals.exit, payload)
     })
+  }
+
+  has(id: TerminalId): boolean {
+    return this.entries.has(id)
   }
 
   write(id: TerminalId, data: string): void {
@@ -109,6 +165,8 @@ export class PtyManager {
     return entry.buffer.join('')
   }
 
+  // Called on app quit. Kills every pty (and the shell + child processes running
+  // in it); terminals are recreated fresh from persisted state on next launch.
   disposeAll(): void {
     for (const entry of this.entries.values()) {
       try {

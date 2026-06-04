@@ -75,6 +75,7 @@ const api = {
       ipcRenderer.invoke(IPC.dialog.pickFolder),
   },
   system: {
+    getVersion: (): Promise<string> => ipcRenderer.invoke(IPC.system.version),
     notify: (payload: NotifyPayload): Promise<void> =>
       ipcRenderer.invoke(IPC.system.notify, payload),
     openExternal: (url: string): Promise<void> =>
@@ -100,6 +101,8 @@ const api = {
       ipcRenderer.invoke(IPC.fs.rename, projectId, from, to),
     remove: (projectId: ProjectId, relPath: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.fs.remove, projectId, relPath),
+    duplicate: (projectId: ProjectId, relPath: string): Promise<string | null> =>
+      ipcRenderer.invoke(IPC.fs.duplicate, projectId, relPath),
     open: (projectId: ProjectId, relPath: string): Promise<boolean> =>
       ipcRenderer.invoke(IPC.fs.open, projectId, relPath),
     reveal: (projectId: ProjectId, relPath: string): Promise<void> =>

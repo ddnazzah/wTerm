@@ -54,7 +54,7 @@ export function TerminalSidebarItem({
     >
       <span
         className={[
-          'inline-block w-1 h-3 rounded-sm flex-shrink-0',
+          'terminal-item-indicator inline-block w-1 h-3 rounded-sm flex-shrink-0',
           active ? 'bg-accent' : 'bg-foreground/25 group-hover/term:bg-foreground/40',
         ].join(' ')}
         aria-hidden
@@ -84,13 +84,6 @@ export function TerminalSidebarItem({
         >
           {displayName}
         </span>
-      )}
-      {unread && (
-        <span
-          aria-label="Unread activity"
-          title="Wants your input"
-          className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0 animate-pulse"
-        />
       )}
       <button
         type="button"

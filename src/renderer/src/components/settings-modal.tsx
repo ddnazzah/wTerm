@@ -1,6 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettings, DEFAULTS } from '@renderer/state/settings'
-import { THEMES, useTheme } from '@renderer/lib/theme'
 
 interface Props {
   open: boolean
@@ -53,25 +52,55 @@ export function SettingsModal({ open, onClose }: Props) {
         </header>
 
         <div className="px-8 py-7 space-y-10">
-          <ThemeSection />
+          <TerminalSection />
           <EditorSection />
           <FormattingSection />
         </div>
+
+        <AboutFooter />
       </div>
     </div>
   )
 }
 
-function ThemeSection() {
-  const { theme, setTheme } = useTheme()
+function AboutFooter() {
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    void window.api.system.getVersion().then((v) => {
+      if (alive) setVersion(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
   return (
-    <Section title="Theme">
-      <SelectField
-        label="Color theme"
-        value={theme}
-        onChange={(v) => setTheme(v as (typeof THEMES)[number]['id'])}
-        options={THEMES.map((t) => ({ value: t.id, label: t.label }))}
+    <footer className="flex items-center justify-between px-8 py-4 border-t border-accent/14 text-[12px] text-foreground/45">
+      <span>wTerm</span>
+      <span className="tabular-nums">{version ? `v${version}` : ''}</span>
+    </footer>
+  )
+}
+
+function TerminalSection() {
+  const startupCommand = useSettings((s) => s.terminal.startupCommand)
+  const update = useSettings((s) => s.updateTerminal)
+  return (
+    <Section
+      title="Terminal"
+      actionLabel={startupCommand ? 'Clear' : undefined}
+      onAction={startupCommand ? () => update({ startupCommand: '' }) : undefined}
+    >
+      <TextAreaField
+        label="Startup command"
+        value={startupCommand}
+        placeholder="e.g. claude --dangerously-skip-permissions"
+        onChange={(v) => update({ startupCommand: v })}
       />
+      <p className="text-[12px] leading-relaxed text-foreground/55">
+        Runs automatically in every new terminal tab once the shell is ready. Leave empty to
+        disable (the default). Multiple lines run as separate commands.
+      </p>
     </Section>
   )
 }
@@ -240,47 +269,28 @@ function TextField({
   )
 }
 
-function SelectField({
+function TextAreaField({
   label,
   value,
-  options,
+  placeholder,
   onChange,
 }: {
   label: string
   value: string
-  options: Array<{ value: string; label: string }>
+  placeholder?: string
   onChange: (v: string) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <label className="text-[13px] text-foreground/80 flex-1">{label}</label>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="appearance-none bg-foreground/5 text-[13px] pl-3 pr-8 py-1.5 rounded-md outline-none focus:bg-foreground/10 hover:bg-foreground/10 transition-colors cursor-pointer min-w-[160px]"
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <svg
-          aria-hidden
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/55"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </div>
+    <div className="flex flex-col gap-2">
+      <label className="text-[13px] text-foreground/80">{label}</label>
+      <textarea
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        rows={3}
+        onChange={(e) => onChange(e.target.value)}
+        className="resize-y min-h-[72px] bg-foreground/5 text-[13px] px-2.5 py-2 rounded-md outline-none focus:bg-foreground/10 font-mono leading-relaxed"
+      />
     </div>
   )
 }

@@ -31,6 +31,8 @@ export function registerSystemIpc(): void {
     shell.openPath(project.path)
   })
 
+  ipcMain.handle(IPC.system.version, (): string => app.getVersion())
+
   ipcMain.handle(IPC.system.openExternal, (_e, url: string): void => {
     if (typeof url !== 'string') return
     if (!/^https?:\/\//i.test(url)) return

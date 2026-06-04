@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MAX_TEXT_FILE_LABEL } from '@shared/types'
 import { tabKey, useWorkspace, type OpenedFile } from '@renderer/state/store'
 import { useSettings } from '@renderer/state/settings'
 import { formattableParser, formatText } from '@renderer/lib/formatter'
 import { CodeEditor } from './code-editor'
+import { MarkdownPreview } from './markdown-preview'
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'])
+const MARKDOWN_EXTS = new Set(['md', 'mdx', 'markdown'])
 
 interface Props {
   projectId: string
@@ -93,7 +96,7 @@ function EditorPane({
     return (
       <Placeholder
         title="Binary or large file"
-        hint="This file is over 512 KB or not text. Use “Open externally” from the tree to view it."
+        hint={`This file is over ${MAX_TEXT_FILE_LABEL} or not text. Use “Open externally” from the tree to view it.`}
       />
     )
   }
@@ -102,6 +105,10 @@ function EditorPane({
   }
 
   const name = file.path.split('/').pop() ?? file.path
+  const isMarkdown = MARKDOWN_EXTS.has(extOf(file.path))
+  if (isMarkdown) {
+    return <MarkdownPane name={name} content={state.current} onSave={(t) => void onSave(file, t)} onChange={(t) => onChange(file, t)} fileKey={tabKey(file)} />
+  }
   const formattable = formattableParser(name) !== null
 
   const format = formattable
@@ -127,6 +134,90 @@ function EditorPane({
       onSave={(text) => void onSave(file, text)}
       format={format}
     />
+  )
+}
+
+function MarkdownPane({
+  name,
+  content,
+  fileKey,
+  onSave,
+  onChange,
+}: {
+  name: string
+  content: string
+  fileKey: string
+  onSave: (text: string) => void
+  onChange: (text: string) => void
+}) {
+  const [mode, setMode] = useState<'preview' | 'code'>('preview')
+  const editorSettings = useSettings((s) => s.editor)
+
+  const format = useCallback(
+    async (text: string) => {
+      try {
+        return await formatText(text, name, {
+          tabWidth: editorSettings.tabSize,
+          useTabs: !editorSettings.insertSpaces,
+        })
+      } catch (err) {
+        console.warn('[format] failed:', err)
+        return null
+      }
+    },
+    [name, editorSettings.tabSize, editorSettings.insertSpaces]
+  )
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex shrink-0 items-center justify-end gap-1 border-b border-foreground/7 px-2 py-1">
+        <ModeButton active={mode === 'preview'} onClick={() => setMode('preview')}>
+          Preview
+        </ModeButton>
+        <ModeButton active={mode === 'code'} onClick={() => setMode('code')}>
+          Code
+        </ModeButton>
+      </div>
+      <div className="min-h-0 flex-1">
+        {mode === 'preview' ? (
+          <MarkdownPreview content={content} />
+        ) : (
+          <CodeEditor
+            fileKey={fileKey}
+            filename={name}
+            initialContent={content}
+            onChange={onChange}
+            onSave={onSave}
+            format={format}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ModeButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'rounded-md px-2.5 py-1 text-[11px] transition-colors',
+        active
+          ? 'bg-foreground/10 text-foreground'
+          : 'text-foreground/55 hover:bg-foreground/5 hover:text-foreground/80',
+      ].join(' ')}
+    >
+      {children}
+    </button>
   )
 }
 

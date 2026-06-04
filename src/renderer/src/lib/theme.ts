@@ -1,70 +1,21 @@
-import { useSyncExternalStore } from 'react'
+export type ThemeName = 'halcyon'
 
-export type ThemeName = 'dark' | 'mint'
+// Single-theme app. Halcyon is the only theme; there is no switching/persistence.
+const THEME: ThemeName = 'halcyon'
 
-export const THEMES: ReadonlyArray<{ id: ThemeName; label: string }> = [
-  { id: 'dark', label: 'Default' },
-  { id: 'mint', label: 'Mint' },
-]
-
-const STORAGE_KEY = 'tw:theme'
-const DEFAULT_THEME: ThemeName = 'dark'
-
-function isThemeName(v: unknown): v is ThemeName {
-  return v === 'dark' || v === 'mint'
-}
-
-function readStored(): ThemeName {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return isThemeName(raw) ? raw : DEFAULT_THEME
-  } catch {
-    return DEFAULT_THEME
-  }
-}
-
-function applyTheme(theme: ThemeName): void {
+function applyTheme(): void {
   const root = document.documentElement
-  root.setAttribute('data-theme', theme)
-  // HeroUI uses Tailwind's `dark` class for color-scheme utilities; both themes are dark-mode.
+  root.setAttribute('data-theme', THEME)
+  // HeroUI uses Tailwind's `dark` class for color-scheme utilities.
   root.classList.add('dark')
 }
 
-const listeners = new Set<() => void>()
-
-function emit(): void {
-  for (const l of listeners) l()
-}
-
 export function initTheme(): void {
-  applyTheme(readStored())
+  applyTheme()
 }
 
-export function setTheme(theme: ThemeName): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, theme)
-  } catch {
-    // ignore — storage may be unavailable
-  }
-  applyTheme(theme)
-  emit()
-}
-
-function subscribe(cb: () => void): () => void {
-  listeners.add(cb)
-  return () => {
-    listeners.delete(cb)
-  }
-}
-
-export function useTheme(): {
-  theme: ThemeName
-  setTheme: (t: ThemeName) => void
-} {
-  const theme = useSyncExternalStore(
-    subscribe,
-    () => readStored(),
-    () => DEFAULT_THEME
-  )
-  return { theme, setTheme }
+// Kept as a hook so existing call sites that read `theme` for xterm / CodeMirror
+// theming keep working unchanged.
+export function useTheme(): { theme: ThemeName } {
+  return { theme: THEME }
 }

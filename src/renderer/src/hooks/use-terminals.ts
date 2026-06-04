@@ -1,9 +1,8 @@
 import { useCallback } from 'react'
-import { useWorkspace } from '@renderer/state/store'
+import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import type { Project } from '@shared/types'
 
 export function useTerminals(project: Project | null) {
-  const addTerminal = useWorkspace((s) => s.addTerminal)
   const removeTerminalLocal = useWorkspace((s) => s.removeTerminalLocal)
   const renameTerminalLocal = useWorkspace((s) => s.renameTerminalLocal)
   const setActiveTerminal = useWorkspace((s) => s.setActiveTerminal)
@@ -13,10 +12,8 @@ export function useTerminals(project: Project | null) {
 
   const create = useCallback(async () => {
     if (!project) return null
-    const record = await window.api.terminals.create({ projectId: project.id })
-    if (record) addTerminal(project.id, record)
-    return record
-  }, [project, addTerminal])
+    return createProjectTerminal(project.id)
+  }, [project])
 
   const close = useCallback(
     async (terminalId: string) => {

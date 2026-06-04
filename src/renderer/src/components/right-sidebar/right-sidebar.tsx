@@ -61,7 +61,7 @@ export function RightSidebar({ project }: Props) {
 
   return (
     <aside
-      className="relative flex flex-col h-full flex-shrink-0 border-l border-accent/14 bg-background/40 backdrop-blur-sm"
+      className="relative flex flex-col h-full flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm"
       style={{ width, minWidth: RIGHT_SIDEBAR_MIN_WIDTH, maxWidth: RIGHT_SIDEBAR_MAX_WIDTH }}
     >
       <header className="app-titlebar h-11 flex items-center px-4 border-b border-accent/14">

@@ -2,8 +2,8 @@ import { ipcMain, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
-import { IPC, type FsEntry, type ProjectId } from '@shared/types'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { IPC, MAX_TEXT_FILE_BYTES, type FsEntry, type ProjectId } from '@shared/types'
 import { getProject } from '../store/state'
 
 // Hard cap on a single pasted/dropped blob — pastes from screenshot tools land
@@ -12,7 +12,7 @@ const MAX_PASTE_BYTES = 25 * 1024 * 1024
 
 const SAFE_EXT = /^[a-z0-9]{1,8}$/i
 
-const MAX_TEXT_BYTES = 512 * 1024
+const MAX_TEXT_BYTES = MAX_TEXT_FILE_BYTES
 
 /**
  * Ask git which of the given project-relative paths are ignored.
@@ -208,6 +208,40 @@ export function registerFsIpc(): void {
         return true
       } catch {
         return false
+      }
+    }
+  )
+
+  ipcMain.handle(
+    IPC.fs.duplicate,
+    async (_e, projectId: ProjectId, relPath: string): Promise<string | null> => {
+      const project = getProject(projectId)
+      if (!project) return null
+      const src = resolveSafe(project.path, relPath)
+      if (!src || src === resolve(project.path)) return null
+      try {
+        const dir = dirname(src)
+        const base = basename(src)
+        const dot = base.lastIndexOf('.')
+        const stem = dot > 0 ? base.slice(0, dot) : base
+        const ext = dot > 0 ? base.slice(dot) : ''
+        // Find a free "name copy", "name copy 2", … alongside the original.
+        let dest = ''
+        for (let i = 1; i < 1000; i++) {
+          const suffix = i === 1 ? ' copy' : ` copy ${i}`
+          const candidate = join(dir, `${stem}${suffix}${ext}`)
+          try {
+            await fs.access(candidate)
+          } catch {
+            dest = candidate
+            break
+          }
+        }
+        if (!dest) return null
+        await fs.cp(src, dest, { recursive: true, errorOnExist: true, force: false })
+        return toRel(project.path, dest)
+      } catch {
+        return null
       }
     }
   )

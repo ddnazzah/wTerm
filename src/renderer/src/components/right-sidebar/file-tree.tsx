@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FsEntry, Project } from '@shared/types'
-import { useWorkspace } from '@renderer/state/store'
+import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { FileIcon } from './file-icon'
 
 interface Props {
@@ -92,6 +92,26 @@ export function FileTree({ project }: Props) {
         await window.api.fs.open(project.id, target.path)
         return
       }
+      if (action === 'open-terminal') {
+        const cwd = target.isDirectory ? target.path : parentOf(target.path)
+        const folderName = cwd.split('/').pop() || project.name
+        await createProjectTerminal(project.id, { cwd, name: folderName })
+        return
+      }
+      if (action === 'copy-path') {
+        const abs = `${project.path}/${target.path}`
+        await navigator.clipboard.writeText(abs)
+        return
+      }
+      if (action === 'copy-relative-path') {
+        await navigator.clipboard.writeText(target.path)
+        return
+      }
+      if (action === 'duplicate') {
+        const newPath = await window.api.fs.duplicate(project.id, target.path)
+        if (newPath) await reloadFolder(parentOf(target.path))
+        return
+      }
       if (action === 'rename') {
         setRenaming(target.path)
         return
@@ -105,7 +125,7 @@ export function FileTree({ project }: Props) {
         return
       }
     },
-    [expanded, toggle, project.id, reloadFolder, openFile]
+    [expanded, toggle, project.id, project.path, project.name, reloadFolder, openFile]
   )
 
   const submitCreate = useCallback(
@@ -496,9 +516,13 @@ type ActionKey =
   | 'new-folder'
   | 'rename'
   | 'delete'
+  | 'duplicate'
   | 'reveal'
   | 'open'
   | 'open-externally'
+  | 'open-terminal'
+  | 'copy-path'
+  | 'copy-relative-path'
 interface MenuState {
   x: number
   y: number
@@ -539,22 +563,26 @@ function ContextMenu({
       {target && !target.isDirectory && (
         <>
           <MenuItem onClick={() => onAction('open')}>Open</MenuItem>
-          <MenuItem onClick={() => onAction('open-externally')}>Open externally</MenuItem>
+          <MenuItem onClick={() => onAction('open-externally')}>Open with default app</MenuItem>
           <MenuDivider />
         </>
       )}
       <MenuItem onClick={() => onAction('new-file')}>New file</MenuItem>
       <MenuItem onClick={() => onAction('new-folder')}>New folder</MenuItem>
-      {target && <MenuDivider />}
-      {target && <MenuItem onClick={() => onAction('rename')}>Rename</MenuItem>}
       {target && (
-        <MenuItem onClick={() => onAction('delete')} danger>
-          Move to Trash
-        </MenuItem>
-      )}
-      {target && <MenuDivider />}
-      {target && (
-        <MenuItem onClick={() => onAction('reveal')}>Reveal in Finder</MenuItem>
+        <>
+          <MenuItem onClick={() => onAction('duplicate')}>Duplicate</MenuItem>
+          <MenuItem onClick={() => onAction('rename')}>Rename</MenuItem>
+          <MenuItem onClick={() => onAction('delete')} danger>
+            Move to Trash
+          </MenuItem>
+          <MenuDivider />
+          <MenuItem onClick={() => onAction('copy-path')}>Copy path</MenuItem>
+          <MenuItem onClick={() => onAction('copy-relative-path')}>Copy relative path</MenuItem>
+          <MenuDivider />
+          <MenuItem onClick={() => onAction('reveal')}>Reveal in Finder</MenuItem>
+          <MenuItem onClick={() => onAction('open-terminal')}>New terminal here</MenuItem>
+        </>
       )}
     </div>
   )

@@ -23,9 +23,14 @@ export async function loadState(): Promise<AppState> {
     const raw = await fs.readFile(statePath(), 'utf-8')
     const parsed = JSON.parse(raw) as AppState
     if (parsed?.version === 1 && Array.isArray(parsed.projects)) {
+      // Terminals are session-scoped — their PTYs die on close and we no longer
+      // restore them. Drop any persisted terminal records (and the stale
+      // active-tab map) on load so old/killed terminals never reappear, even
+      // from a state.json written before terminal-restore was removed.
       cache = {
         ...parsed,
-        activeTerminalByProject: parsed.activeTerminalByProject ?? {},
+        projects: parsed.projects.map((p) => ({ ...p, terminals: [] })),
+        activeTerminalByProject: {},
       }
     }
   } catch (err: unknown) {
@@ -66,7 +71,15 @@ function scheduleSave(): void {
 async function writeFile(): Promise<void> {
   const target = statePath()
   const tmp = `${target}.tmp`
-  const json = JSON.stringify(cache, null, 2)
+  // Terminals are session-scoped: their PTYs die when the app closes and we no
+  // longer restore them, so persist projects with their terminal records (and
+  // the now-meaningless active-tab map) stripped out.
+  const persisted: AppState = {
+    ...cache,
+    projects: cache.projects.map((p) => ({ ...p, terminals: [] })),
+    activeTerminalByProject: {},
+  }
+  const json = JSON.stringify(persisted, null, 2)
   await fs.mkdir(join(target, '..'), { recursive: true }).catch(() => {})
   await fs.writeFile(tmp, json, 'utf-8')
   await fs.rename(tmp, target)

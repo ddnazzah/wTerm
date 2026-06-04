@@ -1,0 +1,96 @@
+name: Release
+
+# Builds the macOS DMG and Windows installer and publishes them to a GitHub
+# Release. Triggered by pushing a version tag (e.g. `v0.1.1`), or manually.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build & release (e.g. v0.1.1). Must already exist.'
+        required: true
+
+permissions:
+  contents: write # needed to create the release and upload assets
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon runner -> arm64 DMG
+            build: pnpm dist:mac
+            artifact: 'release/*/wTerm-*-arm64.dmg'
+          - os: windows-latest # x64 runner -> NSIS installer
+            build: pnpm dist:win
+            artifact: 'release/*/wTerm-*-x64-setup.exe'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Use the dispatch input tag when run manually, otherwise the pushed ref.
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.5
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: ${{ matrix.build }}
+        env:
+          # Self-signed personal cert isn't available in CI; produce an ad-hoc
+          # (unsigned) build. Users right-click-Open on first launch — see
+          # RELEASE_NOTES.md. The Windows installer is unsigned regardless.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.os }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: wTerm ${{ github.event.inputs.tag || github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            artifacts/wTerm-*-arm64.dmg
+            artifacts/wTerm-*-x64-setup.exe

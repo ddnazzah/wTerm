@@ -9,6 +9,10 @@ import { useTheme } from '@renderer/lib/theme'
 // parentheses, etc. Embedded single quotes are bridged with `'\''`.
 const shellQuote = (s: string): string => `'${s.replace(/'/g, `'\\''`)}'`
 
+// Clipboard shortcuts differ by platform: macOS uses ⌘C/⌘V, while terminals on
+// Windows/Linux use Ctrl+Shift+C/V (plain Ctrl+C/V are SIGINT / literal-next).
+const isMac = /Mac/i.test(navigator.userAgent)
+
 const MIME_TO_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
@@ -46,6 +50,28 @@ const parseConEmuProgress = (data: string): boolean | null => {
   return null
 }
 
+// Claude Code (and similar agent TUIs) report turn activity through the window
+// title rather than OSC 9;4 progress or a bell: while working it prefixes the
+// title with an animated spinner — braille frames (U+2800–U+28FF) or its ✳
+// marker (U+2733) — followed by the current task, and resets to a bare
+// "✳ Claude Code" when idle. Under default settings that title is the only
+// machine-readable "working" signal it emits, so we drive the busy indicator
+// from it. A spinner/✳ prefix that carries a task (anything other than the idle
+// "Claude Code" branding) means a turn is in flight.
+const SPINNER_PREFIX = /^[✳⠀-⣿]/
+const titleIndicatesWork = (title: string): boolean => {
+  if (!SPINNER_PREFIX.test(title)) return false
+  // Animated braille frames (U+2800–U+28FF) only render while the spinner is
+  // turning, so a braille first character is an unambiguous "working" tell.
+  const code = title.trimStart().charCodeAt(0)
+  if (code >= 0x2800 && code <= 0x28ff) return true
+  const task = title.replace(/^[✳⠀-⣿\s ]+/, '').trim()
+  // Idle when the remainder is just "Claude Code" branding — including when
+  // decorated with a cwd/model (e.g. "Claude Code - ~/proj"). Matching loosely
+  // (not exact-equals) is what stops the halo sticking ON after a turn ends.
+  return task.length > 0 && !/^claude code\b/i.test(task)
+}
+
 // xterm.js takes a JS object (not CSS), so we resolve the theme-aware tokens
 // from `:root` at runtime. The other ANSI slots are theme-agnostic.
 const readVar = (name: string, fallback: string): string => {
@@ -56,25 +82,25 @@ const readVar = (name: string, fallback: string): string => {
 const buildXtermTheme = () => ({
   background: readVar('--background', '#0b0b0f'),
   foreground: readVar('--foreground', '#e5e7eb'),
-  cursor: '#a78bfa',
+  cursor: readVar('--terminal-cursor', '#a78bfa'),
   cursorAccent: readVar('--background', '#0b0b0f'),
-  selectionBackground: 'rgba(167,139,250,0.35)',
-  black: '#1f2937',
-  red: '#ef4444',
-  green: '#10b981',
-  yellow: '#f59e0b',
-  blue: '#3b82f6',
-  magenta: '#ec4899',
-  cyan: '#06b6d4',
-  white: '#e5e7eb',
-  brightBlack: '#374151',
-  brightRed: '#f87171',
-  brightGreen: '#34d399',
-  brightYellow: '#fbbf24',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#f472b6',
-  brightCyan: '#22d3ee',
-  brightWhite: '#f9fafb',
+  selectionBackground: readVar('--terminal-selection', 'rgba(167,139,250,0.35)'),
+  black: readVar('--ansi-black', '#1f2937'),
+  red: readVar('--ansi-red', '#ef4444'),
+  green: readVar('--ansi-green', '#10b981'),
+  yellow: readVar('--ansi-yellow', '#f59e0b'),
+  blue: readVar('--ansi-blue', '#3b82f6'),
+  magenta: readVar('--ansi-magenta', '#ec4899'),
+  cyan: readVar('--ansi-cyan', '#06b6d4'),
+  white: readVar('--ansi-white', '#e5e7eb'),
+  brightBlack: readVar('--ansi-bright-black', '#374151'),
+  brightRed: readVar('--ansi-bright-red', '#f87171'),
+  brightGreen: readVar('--ansi-bright-green', '#34d399'),
+  brightYellow: readVar('--ansi-bright-yellow', '#fbbf24'),
+  brightBlue: readVar('--ansi-bright-blue', '#60a5fa'),
+  brightMagenta: readVar('--ansi-bright-magenta', '#f472b6'),
+  brightCyan: readVar('--ansi-bright-cyan', '#22d3ee'),
+  brightWhite: readVar('--ansi-bright-white', '#f9fafb'),
 })
 
 export function TerminalPane({ terminalId, active, onBell }: Props) {
@@ -84,6 +110,10 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
   const initRef = useRef(false)
   const bellRef = useRef<typeof onBell>(onBell)
   bellRef.current = onBell
+  // Kept in a ref so the long-lived onTitleChange handler can read the current
+  // value without being re-created on every active/inactive toggle.
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   useEffect(() => {
     if (!hostRef.current || initRef.current) return
@@ -105,11 +135,61 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
 
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.loadAddon(new WebLinksAddon())
+    // Cmd/Ctrl-click to open in the default browser; plain click is ignored so
+    // it doesn't steal selection/scrollback interactions.
+    term.loadAddon(
+      new WebLinksAddon((event, uri) => {
+        const mod = event.metaKey || event.ctrlKey
+        if (!mod) return
+        void window.api.system.openExternal(uri)
+      })
+    )
+
+    // xterm tracks its own selection (overlay layer) but never copies it to the
+    // OS clipboard on its own. Wire copy/paste explicitly. On macOS ⌘V is left
+    // to xterm's textarea (native paste already works); elsewhere Ctrl+Shift+V
+    // isn't handled by xterm, so we paste it ourselves.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== 'keydown') return true
+      const key = e.key.toLowerCase()
+      const copyCombo = isMac ? e.metaKey && !e.shiftKey : e.ctrlKey && e.shiftKey
+      if (key === 'c' && copyCombo && term.hasSelection()) {
+        void navigator.clipboard.writeText(term.getSelection())
+        return false
+      }
+      if (key === 'v' && !isMac && e.ctrlKey && e.shiftKey) {
+        void navigator.clipboard.readText().then((text) => {
+          if (text) term.paste(text)
+        })
+        return false
+      }
+      return true
+    })
 
     term.open(hostRef.current)
     termRef.current = term
     fitRef.current = fit
+
+    // Glyphs are cached in a texture atlas at open() time; if the Nerd Font
+    // wasn't loaded yet, the prompt's powerline/icon characters get baked into
+    // the atlas as tofu. Explicitly load the font, then clearTextureAtlas() to
+    // REBUILD the cache with the real glyphs (refresh() alone only repaints from
+    // the stale atlas), refit (cell metrics may have changed), and repaint.
+    void Promise.all([
+      document.fonts.load('13px "MesloLGS NF"'),
+      document.fonts.load('bold 13px "MesloLGS NF"'),
+    ])
+      .catch(() => undefined)
+      .then(() => {
+        if (termRef.current !== term) return
+        try {
+          term.clearTextureAtlas()
+          fit.fit()
+          term.refresh(0, term.rows - 1)
+        } catch {
+          // ignore — teardown race
+        }
+      })
 
     const fitNow = (): void => {
       try {
@@ -150,31 +230,54 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       bellRef.current?.()
     })
 
-    const setTitle = useWorkspace.getState().setTerminalTitle
-    const titleDisposable = term.onTitleChange((title) => {
-      setTitle(terminalId, title)
-    })
-
     const setBusy = (busy: boolean): void => {
       useWorkspace.getState().setTerminalBusy(terminalId, busy)
     }
 
-    // OSC 133 — FinalTerm semantic prompts (shell integration).
-    //   A = prompt start, B = command start (input), C = command output begins,
-    //   D = command finished. Busy spans C..D.
-    const osc133Disposable = term.parser.registerOscHandler(133, (data) => {
-      const kind = data.charAt(0)
-      if (kind === 'C') setBusy(true)
-      else if (kind === 'A' || kind === 'B' || kind === 'D') setBusy(false)
-      return false
+    // The window title is both the tab label and — for agent TUIs like Claude
+    // Code — our "working" signal (see titleIndicatesWork). Drive the busy
+    // indicator off it, and on the working→idle edge (turn finished / wants
+    // attention) fire a notification, but only when this terminal isn't the one
+    // the user is already looking at.
+    const setTitle = useWorkspace.getState().setTerminalTitle
+    let titleWorking = false
+    const titleDisposable = term.onTitleChange((title) => {
+      setTitle(terminalId, title)
+      const working = titleIndicatesWork(title)
+      if (working === titleWorking) return
+      setBusy(working)
+      if (titleWorking && !working && !(activeRef.current && document.hasFocus())) {
+        bellRef.current?.()
+      }
+      titleWorking = working
     })
 
-    // OSC 9 — iTerm2/ConEmu. Subtype `9;4;<state>` is ConEmu progress.
-    // Other `9` subtypes (iTerm2 notifications) we let fall through.
+    // OSC 9 — iTerm2/ConEmu. Subtype `9;4;<state>` is ConEmu taskbar progress, a
+    // generic busy signal some programs emit (Claude Code does not — it uses the
+    // title spinner above). Feed it into the agent "busy" halo. Other `9`
+    // subtypes (iTerm2 notifications) fall through.
     const osc9Disposable = term.parser.registerOscHandler(9, (data) => {
       const busy = parseConEmuProgress(data)
       if (busy !== null) setBusy(busy)
       return false
+    })
+
+    // OSC 52 — clipboard write. Lets terminal programs (e.g. vim/nvim with
+    // clipboard=unnamed, especially over ssh) set the system clipboard. xterm
+    // doesn't honor OSC 52 by default, so bridge it to the system clipboard here.
+    // Format: `52 ; <selection> ; <base64>` (selection is c/p/etc; '?' = query).
+    const osc52Disposable = term.parser.registerOscHandler(52, (data) => {
+      const semi = data.indexOf(';')
+      if (semi === -1) return false
+      const payload = data.slice(semi + 1)
+      if (payload === '?') return false // clipboard read query — not supported
+      try {
+        const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))
+        void navigator.clipboard.writeText(new TextDecoder().decode(bytes))
+      } catch {
+        // malformed base64 — ignore
+      }
+      return true
     })
 
     return () => {
@@ -183,8 +286,8 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       writeDisposable.dispose()
       bellDisposable.dispose()
       titleDisposable.dispose()
-      osc133Disposable.dispose()
       osc9Disposable.dispose()
+      osc52Disposable.dispose()
       ro.disconnect()
       window.removeEventListener('resize', onResize)
       useWorkspace.getState().setTerminalBusy(terminalId, false)
@@ -216,19 +319,21 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
     term.options.theme = buildXtermTheme()
   }, [theme])
 
-  const busy = useWorkspace((s) => !!s.busyByTerminal[terminalId])
   const [dragOver, setDragOver] = useState(false)
   const dragDepthRef = useRef(0)
 
-  const insertPaths = useCallback(
-    (paths: string[]): void => {
-      if (paths.length === 0) return
-      const insert = paths.map(shellQuote).join(' ') + ' '
-      void window.api.terminals.write(terminalId, insert)
-      termRef.current?.focus()
-    },
-    [terminalId]
-  )
+  const insertPaths = useCallback((paths: string[]): void => {
+    if (paths.length === 0) return
+    const term = termRef.current
+    if (!term) return
+    const insert = paths.map(shellQuote).join(' ') + ' '
+    // Use paste() so the data is wrapped in bracketed-paste sequences when the
+    // running program enabled them. Claude Code (and other TUIs) rely on the
+    // \e[200~/\e[201~ markers to recognize a path drop as an image attachment
+    // rather than as typed input.
+    term.paste(insert)
+    term.focus()
+  }, [])
 
   const savePastedFile = useCallback(
     async (file: File): Promise<string | null> => {
@@ -328,14 +433,6 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       }}
     >
       <div className="terminal-host h-full w-full" ref={hostRef} />
-      {busy && (
-        <div
-          className="terminal-progress pointer-events-none absolute inset-x-0 top-0 h-[2px] overflow-hidden"
-          aria-hidden
-        >
-          <div className="terminal-progress-bar h-full w-1/3 bg-accent" />
-        </div>
-      )}
       {dragOver && (
         <div
           className="pointer-events-none absolute inset-2 rounded-lg border-2 border-dashed border-accent/70 bg-accent/10 flex items-center justify-center"

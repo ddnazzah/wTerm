@@ -5,6 +5,37 @@
 @import './themes.css';
 @import '@xterm/xterm/css/xterm.css';
 
+/* The terminal renders in this Nerd Font (see terminal-pane.tsx). It's bundled
+   as a real file so the prompt's powerline/icon glyphs work on every machine —
+   not just ones with MesloLGS NF installed — and so the CSS Font Loading API can
+   track it. xterm caches glyphs at open() time; if the font isn't loaded first,
+   those icons fall back to a font that lacks them and render as tofu. local() is
+   listed first so an installed copy is preferred (no download cost). */
+@font-face {
+  font-family: 'MesloLGS NF';
+  font-weight: normal;
+  font-style: normal;
+  src: local('MesloLGS NF'), url('../assets/fonts/MesloLGS-NF-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'MesloLGS NF';
+  font-weight: bold;
+  font-style: normal;
+  src: local('MesloLGS NF Bold'), url('../assets/fonts/MesloLGS-NF-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'MesloLGS NF';
+  font-weight: normal;
+  font-style: italic;
+  src: local('MesloLGS NF Italic'), url('../assets/fonts/MesloLGS-NF-Italic.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'MesloLGS NF';
+  font-weight: bold;
+  font-style: italic;
+  src: local('MesloLGS NF Bold Italic'), url('../assets/fonts/MesloLGS-NF-BoldItalic.ttf') format('truetype');
+}
+
 html,
 body,
 #root {
@@ -92,54 +123,20 @@ body {
   border-radius: 4px;
 }
 
-/* iTerm2-style indeterminate progress sweep — accent gradient travels across
-   the top of an active/busy terminal pane. */
-.terminal-progress {
-  z-index: 5;
+/* Sidebar item — pulses an accent halo around the left-edge indicator while
+   busy. Layers on top of the active/inactive bar color so the indicator keeps
+   reading as the active-tab marker. This halo is the sole per-terminal activity
+   cue; the terminal name also bolds while there's unread output. */
+.terminal-item-busy .terminal-item-indicator {
+  animation: terminal-item-busy-halo 1.6s ease-in-out infinite;
 }
 
-.terminal-progress-bar {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent) 50%,
-    transparent 100%
-  );
-  border-radius: 999px;
-  animation: terminal-progress-sweep 1.6s ease-in-out infinite;
-  will-change: transform;
-}
-
-@keyframes terminal-progress-sweep {
-  0% {
-    transform: translateX(-110%);
-  }
-  100% {
-    transform: translateX(410%);
-  }
-}
-
-/* Sidebar item — a faint accent underline that pulses while busy. Lives
-   alongside the existing sky 'wants input' dot so the two read distinctly. */
-.terminal-item-busy::after {
-  content: '';
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: 0;
-  height: 1px;
-  background: var(--accent);
-  border-radius: 999px;
-  opacity: 0.7;
-  animation: terminal-item-busy-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes terminal-item-busy-pulse {
+@keyframes terminal-item-busy-halo {
   0%,
   100% {
-    opacity: 0.25;
+    box-shadow: 0 0 0 0 transparent;
   }
   50% {
-    opacity: 0.85;
+    box-shadow: 0 0 6px 2px color-mix(in oklab, var(--accent) 55%, transparent);
   }
 }

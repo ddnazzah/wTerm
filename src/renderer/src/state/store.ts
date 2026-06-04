@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Project, ProjectId, TerminalId, TerminalRecord } from '@shared/types'
+import { useSettings } from './settings'
 
 export const SIDEBAR_MIN_WIDTH = 180
 export const SIDEBAR_MAX_WIDTH = 480
@@ -527,3 +528,18 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       return { busyByTerminal: { ...state.busyByTerminal, [terminalId]: true } }
     }),
 }))
+
+/**
+ * Create a terminal for a project and register it locally. Funnels every
+ * "new tab" path through one place so the configured startup command (Settings
+ * → Terminal) is applied consistently — and only to brand-new tabs.
+ */
+export async function createProjectTerminal(
+  projectId: ProjectId,
+  opts?: { cwd?: string; name?: string }
+): Promise<TerminalRecord | null> {
+  const startupCommand = useSettings.getState().terminal.startupCommand.trim() || undefined
+  const record = await window.api.terminals.create({ projectId, startupCommand, ...opts })
+  if (record) useWorkspace.getState().addTerminal(projectId, record)
+  return record
+}

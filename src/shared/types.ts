@@ -1,6 +1,12 @@
 export type ProjectId = string
 export type TerminalId = string
 
+/** Largest file (in bytes) the in-app editor will load as text. */
+export const MAX_TEXT_FILE_BYTES = 5 * 1024 * 1024
+
+/** Human-readable form of {@link MAX_TEXT_FILE_BYTES}, e.g. "5 MB". */
+export const MAX_TEXT_FILE_LABEL = '5 MB'
+
 export interface TerminalRecord {
   id: TerminalId
   name: string
@@ -26,6 +32,13 @@ export interface CreateTerminalOptions {
   projectId: ProjectId
   name?: string
   shell?: string
+  /** working directory, relative to the project root; defaults to the project root */
+  cwd?: string
+  /**
+   * Command (or multi-line script) to run once the shell is ready. Only applied
+   * to freshly created tabs — never to terminals restored from a prior session.
+   */
+  startupCommand?: string
 }
 
 export type TerminalDataPayload = { id: TerminalId; data: string }
@@ -59,6 +72,7 @@ export const IPC = {
     notify: 'system:notify',
     focusTerminal: 'system:focus-terminal',
     openExternal: 'system:open-external',
+    version: 'system:version',
   },
   fs: {
     list: 'fs:list',
@@ -68,6 +82,7 @@ export const IPC = {
     createFolder: 'fs:create-folder',
     rename: 'fs:rename',
     remove: 'fs:remove',
+    duplicate: 'fs:duplicate',
     open: 'fs:open',
     reveal: 'fs:reveal',
     saveTempPaste: 'fs:save-temp-paste',
