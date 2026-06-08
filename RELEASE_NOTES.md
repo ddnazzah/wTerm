@@ -1,20 +1,23 @@
-# wTerm 0.1.1
+# wTerm 0.1.2
 
-A polish release for wTerm — a multi-project, multi-terminal workspace IDE — focused on a refined Halcyon look, a configurable terminal startup command, and Markdown preview.
+A release for wTerm — a multi-project, multi-terminal workspace IDE — focused on making the app run correctly on Windows, shipped as a clean signed-and-notarized macOS build through the corrected release pipeline.
 
 ## Downloads
 
-- **macOS (Apple Silicon)** — `wTerm-0.1.1-arm64.dmg`
-- **Windows (x64)** — `wTerm-0.1.1-x64-setup.exe`
+- **macOS (Apple Silicon)** — `wTerm-0.1.2-arm64.dmg`
+- **Windows (x64)** — `wTerm-0.1.2-x64-setup.exe`
 
-## What's new in 0.1.1
+## What's changed in 0.1.2
 
-- **Halcyon theme** — the UI is now a single, hand-tuned Halcyon theme (a port of `bchiang7/halcyon-vscode`) across the app chrome, terminal, and editor, replacing the earlier theme picker.
-- **Halcyon CodeMirror editor theme** — the file editor now matches the app, with consistent syntax highlighting.
-- **Terminal startup command** — set a command (or multi-line script) in Settings that runs automatically in every new terminal tab.
-- **Markdown preview** — open a rendered preview of `.md` files (GitHub-flavored Markdown) alongside the editor.
-- **File viewer / file tree improvements** — refinements to the right-sidebar file tree and file viewer/editor.
-- **Terminal & PTY refinements** — stability and behavior improvements in the terminal pane and PTY manager.
+- **Windows support** — the app now runs correctly on Windows, which was built on macOS and carried several platform assumptions:
+  - Default shell is now **PowerShell** on Windows (override via `WTERM_SHELL`) instead of a hardcoded `/bin/zsh`.
+  - "Open in Terminal" / "Open in Explorer" use **Windows Terminal** (PowerShell fallback) instead of the macOS-only `open -a iTerm`.
+  - Toast **notifications** now fire reliably (AppUserModelId set on Windows).
+  - **Title bar** renders native min/max/close controls via a title-bar overlay on Windows/Linux.
+  - **Keyboard hints** show `Ctrl+…` off macOS instead of the `Cmd` glyphs.
+  - `pnpm install` no longer exits non-zero on Windows when the optional `node-pty` rebuild is skipped.
+- **Release pipeline fixes** — corrected the CI asset globs so the macOS DMG and Windows installer are reliably attached to the GitHub Release.
+- **Signed + notarized macOS build** — the macOS DMG is built with an Apple **Developer ID** certificate and **notarized by Apple**, so it opens with no Gatekeeper workaround.
 
 ## macOS install instructions
 
@@ -32,13 +35,16 @@ The Windows installer is **unsigned**. SmartScreen will show "Windows protected 
 1. Click **More info**.
 2. Click **Run anyway**.
 
-The installer (`wTerm-0.1.1-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
+The installer (`wTerm-0.1.2-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
 
 ## What's in this build
 
 See the [README](./README.md) for the full feature list. Highlights:
 
 - Multi-project, multi-terminal workspace with persistent layout
+- Single hand-tuned Halcyon theme across app chrome, terminal, and editor
+- Configurable terminal startup command (runs in every new terminal tab)
+- Markdown preview (GitHub-flavored) for `.md` files
 - Background-bell notifications (Claude Code, aider, npm prompts wake you)
 - Sidebar unread dots that aggregate to the project row when collapsed
 - Powerlevel10k-friendly font stack
@@ -57,10 +63,10 @@ See the [README](./README.md) for the full feature list. Highlights:
 
 ```bash
 # macOS / Linux
-shasum -a 256 wTerm-0.1.1-arm64.dmg
+shasum -a 256 wTerm-0.1.2-arm64.dmg
 
 # Windows (PowerShell)
-Get-FileHash wTerm-0.1.1-x64-setup.exe -Algorithm SHA256
+Get-FileHash wTerm-0.1.2-x64-setup.exe -Algorithm SHA256
 ```
 
 Compare against the SHA in the release asset list.
