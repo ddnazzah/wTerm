@@ -119,6 +119,13 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
     if (!hostRef.current || initRef.current) return
     initRef.current = true
 
+    // On Windows, node-pty drives the shell through ConPTY, whose cursor/line
+    // model differs from a Unix PTY. Without telling xterm.js it's talking to a
+    // ConPTY backend, the prompt's editable region is anchored one column off,
+    // so the first character of every prompt line can't be backspaced. The
+    // `windowsPty` option turns on the matching ConPTY heuristics. No-op (and
+    // omitted) off Windows, where windowsBuild is null.
+    const windowsBuild = window.api.system.windowsBuild
     const term = new Terminal({
       fontFamily:
         '"MesloLGS NF", "MesloLGS Nerd Font", "JetBrainsMono Nerd Font", "Hack Nerd Font", "Symbols Nerd Font", "Fira Code", Menlo, Monaco, monospace',
@@ -131,6 +138,9 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       allowProposedApi: true,
       scrollback: 10_000,
       theme: buildXtermTheme(),
+      ...(windowsBuild
+        ? { windowsPty: { backend: 'conpty' as const, buildNumber: windowsBuild } }
+        : {}),
     })
 
     const fit = new FitAddon()

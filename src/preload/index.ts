@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { release } from 'node:os'
 import {
   IPC,
   type AppState,
@@ -23,6 +24,17 @@ import {
   type WorkflowRunSummary,
   type WorkflowSummary,
 } from '@shared/types'
+
+// Windows OS build number (e.g. 19045 from "10.0.19045"), or null off Windows.
+// xterm.js needs this to enable ConPTY-correct input/cursor handling via its
+// `windowsPty` option; the renderer can't read it from `navigator`.
+const windowsBuild: number | null =
+  process.platform === 'win32'
+    ? (() => {
+        const m = /^\d+\.\d+\.(\d+)/.exec(release())
+        return m ? Number(m[1]) : null
+      })()
+    : null
 
 const api = {
   projects: {
@@ -75,6 +87,8 @@ const api = {
       ipcRenderer.invoke(IPC.dialog.pickFolder),
   },
   system: {
+    /** Windows OS build number, or null when not on Windows. */
+    windowsBuild,
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC.system.version),
     notify: (payload: NotifyPayload): Promise<void> =>
       ipcRenderer.invoke(IPC.system.notify, payload),

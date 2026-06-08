@@ -10,6 +10,10 @@ import { TerminalSidebarItem } from './terminal-sidebar-item'
 const TERMINAL_APP = isMac ? 'iTerm' : isWindows ? 'Terminal' : 'terminal'
 const FILE_MANAGER_APP = isMac ? 'Finder' : isWindows ? 'Explorer' : 'file manager'
 
+// Commands the Claude Code menu items auto-run in their fresh terminal tab.
+const CLAUDE_CODE_COMMAND = 'claude'
+const CLAUDE_CODE_YOLO_COMMAND = 'claude --dangerously-skip-permissions'
+
 interface Props {
   project: Project
   selected: boolean
@@ -22,6 +26,8 @@ interface Props {
 
 const ACTIONS = {
   newTerminal: 'new-terminal',
+  claudeCode: 'claude-code',
+  claudeCodeYolo: 'claude-code-yolo',
   rename: 'rename',
   finder: 'finder',
   iterm: 'iterm',
@@ -75,10 +81,23 @@ export function ProjectItem({
     await create()
   }
 
+  // Open + expand the project, then spawn a tab that auto-runs `command`.
+  const handleNewClaudeTerminal = async (command: string, name: string): Promise<void> => {
+    onSelect()
+    setExpanded(project.id, true)
+    await create({ name, startupCommand: command })
+  }
+
   const handleAction = (key: React.Key): void => {
     switch (key as ActionKey) {
       case 'new-terminal':
         void handleNewTerminal()
+        return
+      case 'claude-code':
+        void handleNewClaudeTerminal(CLAUDE_CODE_COMMAND, 'Claude Code')
+        return
+      case 'claude-code-yolo':
+        void handleNewClaudeTerminal(CLAUDE_CODE_YOLO_COMMAND, 'Claude Code ⚡')
         return
       case 'rename':
         setEditing(true)
@@ -188,6 +207,28 @@ export function ProjectItem({
             <Dropdown.Menu onAction={handleAction}>
               <Dropdown.Item id={ACTIONS.newTerminal} textValue="New terminal">
                 <Label>New terminal</Label>
+              </Dropdown.Item>
+              <Dropdown.Item id={ACTIONS.claudeCode} textValue="Claude Code">
+                <Label>Claude Code</Label>
+              </Dropdown.Item>
+              <Dropdown.Item
+                id={ACTIONS.claudeCodeYolo}
+                textValue="Claude Code without permissions"
+              >
+                <Label>
+                  <span className="inline-flex items-center gap-1.5">
+                    Claude Code
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden
+                    >
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                    </svg>
+                  </span>
+                </Label>
               </Dropdown.Item>
               <Dropdown.Item id={ACTIONS.rename} textValue="Rename">
                 <Label>Rename</Label>
