@@ -11,6 +11,13 @@ import { registerGitIpc } from './ipc/git'
 import { registerGitHubIpc } from './ipc/github'
 import { loadState, saveStateNow } from './store/state'
 import { PtyManager } from './pty/manager'
+import {
+  isUpdateReady,
+  quitAndInstallUpdate,
+  registerUpdater,
+  setUpdaterWindow,
+  startUpdateChecks,
+} from './updater'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -42,6 +49,9 @@ if (APP_ICON_PATH && process.platform === 'darwin') {
 
 let mainWindow: BrowserWindow | null = null
 const ptyManager = new PtyManager()
+// Set once we begin tearing down — either a normal quit or an update install —
+// so the `before-quit` handler runs its async save exactly once.
+let isQuitting = false
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -101,8 +111,11 @@ app.whenReady().then(async () => {
   registerFsIpc()
   registerGitIpc()
   registerGitHubIpc()
+  registerUpdater()
 
   createWindow()
+  if (mainWindow) setUpdaterWindow(mainWindow)
+  startUpdateChecks()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -113,13 +126,21 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-let isQuitting = false
 app.on('before-quit', (e) => {
+  // Already tearing down (normal quit in flight, or an update install that set
+  // the guard in prepareForInstall) — let the quit proceed.
   if (isQuitting) return
   e.preventDefault()
   isQuitting = true
   ptyManager.disposeAll()
   saveStateNow()
     .catch((err) => console.error('[quit] state save failed', err))
-    .finally(() => app.exit(0))
+    .finally(() => {
+      // If an update finished downloading, hand off to Squirrel/NSIS instead of
+      // force-exiting — `app.exit()` would skip the installer. The fresh quit it
+      // triggers re-enters this handler, but `isQuitting` is now set so we no-op
+      // and let the install + relaunch proceed.
+      if (isUpdateReady()) quitAndInstallUpdate()
+      else app.exit(0)
+    })
 })

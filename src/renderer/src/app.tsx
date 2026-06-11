@@ -7,6 +7,7 @@ import { EmptyState } from './components/workspace/empty-state'
 import { FileViewer } from './components/workspace/file-viewer'
 import { FileTabs } from './components/workspace/file-tabs'
 import { SettingsModal } from './components/settings-modal'
+import { UpdateBanner } from './components/update-banner'
 import { useProjects } from './hooks/use-projects'
 import { createProjectTerminal, useWorkspace } from './state/store'
 import { isMac, isWindows, kbd } from './lib/platform'
@@ -303,6 +304,7 @@ export default function App() {
         panelDisabled={!selectedProject}
       />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <UpdateBanner />
     </div>
   )
 }

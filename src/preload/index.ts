@@ -19,6 +19,7 @@ import {
   type TerminalExitPayload,
   type TerminalId,
   type TerminalRecord,
+  type UpdateStatus,
   type WorkflowRunDetail,
   type WorkflowRunSummary,
   type WorkflowSummary,
@@ -84,6 +85,16 @@ const api = {
       const listener = (_: unknown, payload: FocusTerminalPayload) => cb(payload)
       ipcRenderer.on(IPC.system.focusTerminal, listener)
       return () => ipcRenderer.off(IPC.system.focusTerminal, listener)
+    },
+  },
+  updater: {
+    getStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(IPC.update.getStatus),
+    check: (): Promise<void> => ipcRenderer.invoke(IPC.update.check),
+    install: (): Promise<void> => ipcRenderer.invoke(IPC.update.install),
+    onStatus: (cb: (status: UpdateStatus) => void): (() => void) => {
+      const listener = (_: unknown, status: UpdateStatus) => cb(status)
+      ipcRenderer.on(IPC.update.status, listener)
+      return () => ipcRenderer.off(IPC.update.status, listener)
     },
   },
   fs: {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSettings, DEFAULTS } from '@renderer/state/settings'
+import { useUpdates } from '@renderer/state/updates'
 import { kbd } from '@renderer/lib/platform'
 
 interface Props {
@@ -56,6 +57,7 @@ export function SettingsModal({ open, onClose }: Props) {
           <TerminalSection />
           <EditorSection />
           <FormattingSection />
+          <UpdatesSection />
         </div>
 
         <AboutFooter />
@@ -172,6 +174,76 @@ function FormattingSection() {
       </p>
     </Section>
   )
+}
+
+function UpdatesSection() {
+  const [version, setVersion] = useState<string | null>(null)
+  const status = useUpdates((s) => s.status)
+  const check = useUpdates((s) => s.check)
+  const install = useUpdates((s) => s.install)
+
+  useEffect(() => {
+    let alive = true
+    void window.api.system.getVersion().then((v) => {
+      if (alive) setVersion(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const busy = status.state === 'checking' || status.state === 'available' || status.state === 'downloading'
+
+  return (
+    <Section title="Updates">
+      <div className="flex items-center gap-3">
+        <label className="text-[13px] text-foreground/80 flex-1">Current version</label>
+        <span className="text-[13px] text-foreground/60 tabular-nums">{version ? `v${version}` : '—'}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[12px] text-foreground/55">{updateStatusLabel(status)}</span>
+        {status.state === 'downloaded' ? (
+          <button
+            type="button"
+            onClick={install}
+            className="rounded-md bg-accent/90 px-3 py-1.5 text-[12px] font-medium text-background hover:bg-accent"
+          >
+            Restart to update
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={check}
+            disabled={busy}
+            className="rounded-md bg-foreground/5 px-3 py-1.5 text-[12px] text-foreground/80 hover:bg-foreground/10 disabled:opacity-50 disabled:hover:bg-foreground/5"
+          >
+            {status.state === 'checking' ? 'Checking…' : 'Check for updates'}
+          </button>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+function updateStatusLabel(status: ReturnType<typeof useUpdates.getState>['status']): string {
+  switch (status.state) {
+    case 'idle':
+      return 'Automatically checks for updates on launch.'
+    case 'unsupported':
+      return 'Updates apply to the installed app only.'
+    case 'checking':
+      return 'Checking for updates…'
+    case 'available':
+      return `Downloading v${status.version}…`
+    case 'not-available':
+      return "You're on the latest version."
+    case 'downloading':
+      return `Downloading v${status.version}… ${status.percent}%`
+    case 'downloaded':
+      return `v${status.version} downloaded — restart to apply.`
+    case 'error':
+      return `Update check failed: ${status.message}`
+  }
 }
 
 // ---- primitives ----

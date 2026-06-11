@@ -20,6 +20,7 @@ A project sidebar on the left, real terminals (and a file editor) in the center,
 - **Persistent layout.** Projects, terminal names, the selected project, and the active terminal per project all survive quit/restart. (PTY processes themselves don't — the OS can't reparent child processes across app launches.)
 - **Single Halcyon theme.** One hand-tuned deep-navy palette across the app chrome, terminal, and editor. Font stack leads with the bundled `MesloLGS NF` so Powerlevel10k powerline glyphs render correctly.
 - **Native escape hatch.** Per-project "Open in Terminal" / "Open in file manager" — iTerm on macOS, Windows Terminal on Windows — for when you want a standalone terminal window or to poke at the filesystem.
+- **Auto-update.** The installed app checks GitHub Releases on launch (and hourly), downloads new versions in the background, and shows a "Restart to update" banner — otherwise the update installs on next quit. macOS updates are delivered through the signed + notarized build; there's also a manual "Check for updates" in Settings.
 
 ## Stack
 
@@ -109,7 +110,6 @@ Things this doesn't do yet but probably should:
 
 - **Daemonized PTYs** so running commands survive app restart (would need a separate long-lived process)
 - **Split view** (two terminals side-by-side within one project)
-- **Auto-update** — currently you grab new installers from the Releases page by hand
 - **Linux support** — currently macOS arm64 and Windows x64 only
 - **Code signing on Windows** — installer is unsigned, SmartScreen prompts on first launch
 

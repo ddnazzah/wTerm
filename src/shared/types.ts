@@ -74,6 +74,12 @@ export const IPC = {
     openExternal: 'system:open-external',
     version: 'system:version',
   },
+  update: {
+    check: 'update:check',
+    install: 'update:install',
+    getStatus: 'update:get-status',
+    status: 'update:status',
+  },
   fs: {
     list: 'fs:list',
     readText: 'fs:read-text',
@@ -124,6 +130,23 @@ export interface FocusTerminalPayload {
   projectId: ProjectId
   terminalId: TerminalId
 }
+
+// ---- Auto-update ----
+
+/**
+ * Lifecycle of the auto-updater, pushed from main to renderer on every
+ * transition. `unsupported` is reported in dev / unpackaged builds where no
+ * update feed exists. `version` is the *available* version (not the running one).
+ */
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'unsupported' }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available'; version: string }
+  | { state: 'downloading'; percent: number; version: string }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string }
 
 // ---- File system ----
 
