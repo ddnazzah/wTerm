@@ -1,23 +1,19 @@
-# wTerm 0.1.2
+# wTerm 0.1.3
 
-A release for wTerm — a multi-project, multi-terminal workspace IDE — focused on making the app run correctly on Windows, shipped as a clean signed-and-notarized macOS build through the corrected release pipeline.
+A release for wTerm — a multi-project, multi-terminal workspace IDE — that adds in-app **auto-update**, so future versions install themselves instead of being downloaded by hand.
 
 ## Downloads
 
-- **macOS (Apple Silicon)** — `wTerm-0.1.2-arm64.dmg`
-- **Windows (x64)** — `wTerm-0.1.2-x64-setup.exe`
+- **macOS (Apple Silicon)** — `wTerm-0.1.3-arm64.dmg`
+- **Windows (x64)** — `wTerm-0.1.3-x64-setup.exe`
 
-## What's changed in 0.1.2
+## What's changed in 0.1.3
 
-- **Windows support** — the app now runs correctly on Windows, which was built on macOS and carried several platform assumptions:
-  - Default shell is now **PowerShell** on Windows (override via `WTERM_SHELL`) instead of a hardcoded `/bin/zsh`.
-  - "Open in Terminal" / "Open in Explorer" use **Windows Terminal** (PowerShell fallback) instead of the macOS-only `open -a iTerm`.
-  - Toast **notifications** now fire reliably (AppUserModelId set on Windows).
-  - **Title bar** renders native min/max/close controls via a title-bar overlay on Windows/Linux.
-  - **Keyboard hints** show `Ctrl+…` off macOS instead of the `Cmd` glyphs.
-  - `pnpm install` no longer exits non-zero on Windows when the optional `node-pty` rebuild is skipped.
-- **Release pipeline fixes** — corrected the CI asset globs so the macOS DMG and Windows installer are reliably attached to the GitHub Release.
-- **Signed + notarized macOS build** — the macOS DMG is built with an Apple **Developer ID** certificate and **notarized by Apple**, so it opens with no Gatekeeper workaround.
+- **Auto-update** — the installed app now checks GitHub Releases on launch (and hourly), downloads new versions in the background, and shows a "Restart to update" banner. If you don't restart, the update installs on the next quit.
+  - A manual **Check for updates** control lives in **Settings ▸ Updates**, alongside the current version and live status.
+  - macOS updates ship through the existing **Developer ID-signed + notarized** build (Squirrel handles the swap); Windows updates run the NSIS installer.
+  - **Note:** this is the first build that contains the updater, so 0.1.3 itself is a manual install. Auto-update takes effect from 0.1.3 onward — a 0.1.3 user is updated to 0.1.4 automatically.
+- **Release pipeline** — the build now also publishes the electron-updater feed (`latest-mac.yml`, `latest.yml`, the macOS update `.zip`, and blockmaps) to each GitHub Release so installed apps can discover new versions.
 
 ## macOS install instructions
 
@@ -26,7 +22,7 @@ The macOS build is signed with an Apple **Developer ID** certificate and **notar
 1. Open the DMG and drag **wTerm** to **Applications**.
 2. Launch it from Applications or Spotlight.
 
-That's it — the first launch goes straight through.
+That's it — the first launch goes straight through, and the app will keep itself up to date from here on.
 
 ## Windows first-launch instructions
 
@@ -35,12 +31,13 @@ The Windows installer is **unsigned**. SmartScreen will show "Windows protected 
 1. Click **More info**.
 2. Click **Run anyway**.
 
-The installer (`wTerm-0.1.2-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
+The installer (`wTerm-0.1.3-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
 
 ## What's in this build
 
 See the [README](./README.md) for the full feature list. Highlights:
 
+- Auto-update from GitHub Releases (new in 0.1.3)
 - Multi-project, multi-terminal workspace with persistent layout
 - Single hand-tuned Halcyon theme across app chrome, terminal, and editor
 - Configurable terminal startup command (runs in every new terminal tab)
@@ -57,16 +54,15 @@ See the [README](./README.md) for the full feature list. Highlights:
 - Windows: x64 only (no ARM build)
 - No Linux build
 - PTY processes don't survive app restart (daemonized PTYs are on the roadmap)
-- No auto-update — grab new installers from the Releases page
 
 ## Verifying the download (optional)
 
 ```bash
 # macOS / Linux
-shasum -a 256 wTerm-0.1.2-arm64.dmg
+shasum -a 256 wTerm-0.1.3-arm64.dmg
 
 # Windows (PowerShell)
-Get-FileHash wTerm-0.1.2-x64-setup.exe -Algorithm SHA256
+Get-FileHash wTerm-0.1.3-x64-setup.exe -Algorithm SHA256
 ```
 
 Compare against the SHA in the release asset list.
