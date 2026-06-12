@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-REPO="ddnazzah/terminal-workspace"
+REPO="ddnazzah/wTerm"
 ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
 
 if [[ ! -f "$ENV_FILE" ]]; then
