@@ -24,9 +24,9 @@ while keeping terminals as the primary, central surface — and we want files to
   are tabs *inside* the modal.
 - Reference target chosen: "VS Code chrome, terminals central" (not full editor-center
   inversion).
-- **Visual reference = the Agent Mission Control screenshots**, applied to wTerm's own
-  content (projects + terminals). We replicate the *look*, not AMC's sessions/agent-chat
-  data, which wTerm doesn't have. Concretely from the images:
+- **Visual reference = the Visual Studio / VS Code agent-window screenshots**, applied to
+  wTerm's own content (projects + terminals). We replicate the *look*, not the reference's
+  sessions/agent-chat data, which wTerm doesn't have. Concretely from the images:
   - **Top bar:** a centered title (`<active terminal or project> · wTerm`), with the
     existing window/update affordances kept where they are.
   - **File-open as a titled, centered modal:** the file opens in a floating panel with its
