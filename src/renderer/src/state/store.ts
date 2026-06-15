@@ -20,6 +20,20 @@ const RIGHT_SIDEBAR_WIDTH_KEY = 'tw:right-sidebar-width'
 const RIGHT_SIDEBAR_COLLAPSED_KEY = 'tw:right-sidebar-collapsed'
 const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
 const FILE_PANE_WIDTH_KEY = 'tw:file-pane-width'
+const FILE_MODAL_SIZE_KEY = 'tw:file-modal-size'
+
+const readInitialFileModalSize = (): { width: number; height: number } => {
+  try {
+    const raw = localStorage.getItem(FILE_MODAL_SIZE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { width: number; height: number }
+      if (parsed?.width && parsed?.height) return parsed
+    }
+  } catch {
+    // ignore
+  }
+  return { width: 900, height: 600 }
+}
 
 export type RightSidebarTab = 'files' | 'git'
 
@@ -134,6 +148,13 @@ interface WorkspaceState {
   /** Load + edit state per tab. */
   fileStates: Record<FileTabKey, FileLoadState>
 
+  fileModalOpen: boolean
+  fileModalWidth: number
+  fileModalHeight: number
+  openFileModal: () => void
+  closeFileModal: () => void
+  setFileModalSize: (width: number, height: number) => void
+
   openFile: (file: OpenedFile) => void
   closeFile: (file: OpenedFile) => void
   setActiveFile: (projectId: string, path: string | null) => void
@@ -236,6 +257,22 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     }
   },
 
+  fileModalOpen: false,
+  fileModalWidth: readInitialFileModalSize().width,
+  fileModalHeight: readInitialFileModalSize().height,
+  openFileModal: () => set({ fileModalOpen: true }),
+  closeFileModal: () => set({ fileModalOpen: false }),
+  setFileModalSize: (width, height) => {
+    const w = Math.max(420, Math.min(width, window.innerWidth - 80))
+    const h = Math.max(300, Math.min(height, window.innerHeight - 80))
+    set({ fileModalWidth: w, fileModalHeight: h })
+    try {
+      localStorage.setItem(FILE_MODAL_SIZE_KEY, JSON.stringify({ width: w, height: h }))
+    } catch {
+      // ignore
+    }
+  },
+
   openFiles: [],
   activeFileByProject: {},
   fileStates: {},
@@ -252,6 +289,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         fileStates: alreadyOpen
           ? state.fileStates
           : { ...state.fileStates, [key]: { kind: 'loading' } },
+        fileModalOpen: true,
       }
     }),
 
