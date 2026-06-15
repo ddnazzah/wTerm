@@ -29,6 +29,7 @@ export default function App() {
   const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
   const rightSidebarCollapsed = useWorkspace((s) => s.rightSidebarCollapsed)
   const toggleRightSidebar = useWorkspace((s) => s.toggleRightSidebar)
+  const openFiles = useWorkspace((s) => s.openFiles)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const pendingFocusRef = useRef<{ projectId: string; terminalId: string } | null>(null)
@@ -155,6 +156,8 @@ export default function App() {
 
   const showEmptyNoProject = !selectedProject
   const showEmptyNoTerminals = !!selectedProject && selectedProject.terminals.length === 0
+  const selectedHasOpenFiles =
+    !!selectedProject && openFiles.some((f) => f.projectId === selectedProject.id)
 
   // When the right sidebar is hidden, the main header runs to the window's right
   // edge — where the Windows window-controls overlay sits — so reserve room so
@@ -214,7 +217,7 @@ export default function App() {
         />
       </div>
       <StatusBar project={selectedProject} />
-      {selectedProject && <FileModal projectId={selectedProject.id} />}
+      {selectedProject && selectedHasOpenFiles && <FileModal projectId={selectedProject.id} />}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <UpdateBanner />
     </div>

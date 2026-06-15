@@ -10,16 +10,11 @@ export const RIGHT_SIDEBAR_MIN_WIDTH = 260
 export const RIGHT_SIDEBAR_MAX_WIDTH = 640
 export const RIGHT_SIDEBAR_DEFAULT_WIDTH = 340
 
-export const FILE_PANE_MIN_WIDTH = 320
-export const FILE_PANE_MAX_WIDTH = 1200
-export const FILE_PANE_DEFAULT_WIDTH = 560
-
 const SIDEBAR_WIDTH_KEY = 'tw:sidebar-width'
 const SIDEBAR_COLLAPSED_KEY = 'tw:sidebar-collapsed'
 const RIGHT_SIDEBAR_WIDTH_KEY = 'tw:right-sidebar-width'
 const RIGHT_SIDEBAR_COLLAPSED_KEY = 'tw:right-sidebar-collapsed'
 const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
-const FILE_PANE_WIDTH_KEY = 'tw:file-pane-width'
 const FILE_MODAL_SIZE_KEY = 'tw:file-modal-size'
 
 const readInitialFileModalSize = (): { width: number; height: number } => {
@@ -56,9 +51,6 @@ const clampSidebarWidth = (w: number): number =>
 
 const clampRightSidebarWidth = (w: number): number =>
   Math.min(RIGHT_SIDEBAR_MAX_WIDTH, Math.max(RIGHT_SIDEBAR_MIN_WIDTH, Math.round(w)))
-
-const clampFilePaneWidth = (w: number): number =>
-  Math.min(FILE_PANE_MAX_WIDTH, Math.max(FILE_PANE_MIN_WIDTH, Math.round(w)))
 
 const readInitialSidebarWidth = (): number => {
   try {
@@ -106,16 +98,6 @@ const readInitialRightSidebarTab = (): RightSidebarTab => {
   }
 }
 
-const readInitialFilePaneWidth = (): number => {
-  try {
-    const raw = localStorage.getItem(FILE_PANE_WIDTH_KEY)
-    const n = raw ? Number.parseInt(raw, 10) : NaN
-    return Number.isFinite(n) ? clampFilePaneWidth(n) : FILE_PANE_DEFAULT_WIDTH
-  } catch {
-    return FILE_PANE_DEFAULT_WIDTH
-  }
-}
-
 interface WorkspaceState {
   projects: Project[]
   selectedProjectId: ProjectId | null
@@ -138,9 +120,6 @@ interface WorkspaceState {
   setRightSidebarCollapsed: (collapsed: boolean) => void
   toggleRightSidebar: () => void
   setRightSidebarTab: (tab: RightSidebarTab) => void
-
-  filePaneWidth: number
-  setFilePaneWidth: (width: number) => void
 
   openFiles: OpenedFile[]
   /** Per-project active file path (null = no file open in that project). */
@@ -205,18 +184,6 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   rightSidebarWidth: readInitialRightSidebarWidth(),
   rightSidebarCollapsed: readInitialRightSidebarCollapsed(),
   rightSidebarTab: readInitialRightSidebarTab(),
-
-  filePaneWidth: readInitialFilePaneWidth(),
-
-  setFilePaneWidth: (width) => {
-    const next = clampFilePaneWidth(width)
-    set({ filePaneWidth: next })
-    try {
-      localStorage.setItem(FILE_PANE_WIDTH_KEY, String(next))
-    } catch {
-      // ignore
-    }
-  },
 
   setRightSidebarWidth: (width) => {
     const next = clampRightSidebarWidth(width)
@@ -306,10 +273,12 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
             .at(-1)?.path ?? null
         : state.activeFileByProject[file.projectId] ?? null
       const { [key]: _omit, ...rest } = state.fileStates
+      const remainingForProject = remaining.filter((f) => f.projectId === file.projectId)
       return {
         openFiles: remaining,
         activeFileByProject: { ...state.activeFileByProject, [file.projectId]: nextActive },
         fileStates: rest,
+        fileModalOpen: remainingForProject.length === 0 ? false : state.fileModalOpen,
       }
     }),
 
@@ -442,6 +411,9 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       expandedProjectIds: id
         ? { ...state.expandedProjectIds, [id]: true }
         : state.expandedProjectIds,
+      // The file modal is a per-open-action overlay; switching projects dismisses
+      // it so it only ever reappears when the user opens a file.
+      fileModalOpen: false,
     })),
 
   renameProject: (id, name) =>
