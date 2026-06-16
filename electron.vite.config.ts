@@ -22,6 +22,7 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    worker: { format: 'es' },
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
