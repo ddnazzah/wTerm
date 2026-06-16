@@ -39,6 +39,11 @@
     --accent: #ffcc66;
     --accent-foreground: #171c28;
 
+    --git-modified: #d7a85f;
+    --git-added: #5fb87a;
+    --git-deleted: #d16969;
+    --git-conflict: #d98e4f;
+
     --success: #bae67e;
     --success-foreground: #171c28;
     --warning: #ffcc66;
