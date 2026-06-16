@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FsEntry, Project } from '@shared/types'
+import type { FsEntry, GitFileStatus, GitFileStatusMap, Project } from '@shared/types'
 import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { FileIcon } from './file-icon'
 
@@ -16,6 +16,7 @@ export function FileTree({ project }: Props) {
   )
 
   const [rootEntries, setRootEntries] = useState<FsEntry[]>([])
+  const [gitStatus, setGitStatus] = useState<GitFileStatusMap>({})
   const [children, setChildren] = useState<ChildrenMap>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -33,16 +34,22 @@ export function FileTree({ project }: Props) {
     setLoading(false)
   }, [project.id])
 
+  const reloadGit = useCallback(async () => {
+    setGitStatus(await window.api.git.fileStatus(project.id))
+  }, [project.id])
+
   const reloadFolder = useCallback(
     async (relPath: string) => {
       if (relPath === '') {
         await reloadRoot()
+        void reloadGit()
         return
       }
       const list = await window.api.fs.list(project.id, relPath)
       setChildren((c) => ({ ...c, [relPath]: list }))
+      void reloadGit()
     },
-    [project.id, reloadRoot]
+    [project.id, reloadRoot, reloadGit]
   )
 
   // reset & load when project changes
@@ -53,7 +60,14 @@ export function FileTree({ project }: Props) {
     setCreatingAt(null)
     setRenaming(null)
     void reloadRoot()
-  }, [project.id, reloadRoot])
+    void reloadGit()
+  }, [project.id, reloadRoot, reloadGit])
+
+  useEffect(() => {
+    const onFocus = () => void reloadGit()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [reloadGit])
 
   const toggle = useCallback(
     async (entry: FsEntry) => {
@@ -122,10 +136,11 @@ export function FileTree({ project }: Props) {
         await window.api.fs.remove(project.id, target.path)
         const parent = parentOf(target.path)
         await reloadFolder(parent)
+        void reloadGit()
         return
       }
     },
-    [expanded, toggle, project.id, project.path, project.name, reloadFolder, openFile]
+    [expanded, toggle, project.id, project.path, project.name, reloadFolder, reloadGit, openFile]
   )
 
   const submitCreate = useCallback(
@@ -144,8 +159,9 @@ export function FileTree({ project }: Props) {
       }
       await reloadFolder(creatingAt.parent)
       setCreatingAt(null)
+      void reloadGit()
     },
-    [creatingAt, project.id, reloadFolder]
+    [creatingAt, project.id, reloadFolder, reloadGit]
   )
 
   const submitRename = useCallback(
@@ -167,9 +183,10 @@ export function FileTree({ project }: Props) {
           }
           return next
         })
+        void reloadGit()
       }
     },
-    [project.id, reloadFolder]
+    [project.id, reloadFolder, reloadGit]
   )
 
   return (
@@ -236,6 +253,7 @@ export function FileTree({ project }: Props) {
             depth={0}
             expanded={expanded}
             children_={children}
+            gitStatus={gitStatus}
             renaming={renaming}
             creatingAt={creatingAt}
             onToggle={toggle}
@@ -302,6 +320,7 @@ interface TreeRowProps {
   depth: number
   expanded: Record<string, boolean>
   children_: ChildrenMap
+  gitStatus: GitFileStatusMap
   renaming: string | null
   creatingAt: { parent: string; kind: 'file' | 'folder' } | null
   activePath: string | null
@@ -319,6 +338,7 @@ function TreeRow({
   depth,
   expanded,
   children_,
+  gitStatus,
   renaming,
   creatingAt,
   activePath,
@@ -333,6 +353,10 @@ function TreeRow({
   const isOpen = !!expanded[entry.path]
   const kids = children_[entry.path]
   const isActive = !entry.isDirectory && activePath === entry.path
+  const status = entry.isDirectory
+    ? folderStatus(entry.path, gitStatus)
+    : gitStatus[entry.path]
+  const color = statusColor(status)
 
   return (
     <div>
@@ -380,12 +404,14 @@ function TreeRow({
           <span
             className={[
               'truncate',
+              status === 'deleted' ? 'line-through' : '',
               entry.ignored
                 ? 'text-foreground/40 group-hover/row:text-foreground/60'
                 : isActive
                   ? 'text-foreground'
                   : 'text-foreground/85 group-hover/row:text-foreground',
             ].join(' ')}
+            style={{ color }}
           >
             {entry.name}
           </span>
@@ -417,6 +443,7 @@ function TreeRow({
                 depth={depth + 1}
                 expanded={expanded}
                 children_={children_}
+                gitStatus={gitStatus}
                 renaming={renaming}
                 creatingAt={creatingAt}
                 activePath={activePath}
@@ -620,4 +647,29 @@ function MenuDivider() {
 function parentOf(p: string): string {
   const i = p.lastIndexOf('/')
   return i < 0 ? '' : p.slice(0, i)
+}
+
+function statusColor(s?: GitFileStatus): string | undefined {
+  switch (s) {
+    case 'modified':
+      return 'var(--git-modified)'
+    case 'added':
+    case 'untracked':
+      return 'var(--git-added)'
+    case 'deleted':
+      return 'var(--git-deleted)'
+    case 'conflict':
+      return 'var(--git-conflict)'
+    default:
+      return undefined
+  }
+}
+
+/** A folder is "dirty" if any changed path sits under it. */
+function folderStatus(path: string, map: GitFileStatusMap): GitFileStatus | undefined {
+  const prefix = path + '/'
+  for (const key of Object.keys(map)) {
+    if (key.startsWith(prefix)) return 'modified'
+  }
+  return undefined
 }
