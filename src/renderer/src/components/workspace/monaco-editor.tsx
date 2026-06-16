@@ -1,0 +1,130 @@
+import { useEffect, useRef } from 'react'
+import { monaco, ensureThemes } from '@renderer/lib/monaco-setup'
+import { languageForFilename } from '@renderer/lib/monaco-language'
+import { useTheme } from '@renderer/lib/theme'
+import { useSettings, type EditorSettings } from '@renderer/state/settings'
+
+interface Props {
+  /** Stable per-file key (tabKey). */
+  fileKey: string
+  filename: string
+  initialContent: string
+  onChange: (text: string) => void
+  onSave: (text: string) => void
+  format?: (text: string) => Promise<string | null>
+  readOnly?: boolean
+}
+
+// One model per fileKey so undo history + view state survive remounts/mode switches.
+const models = new Map<string, monaco.editor.ITextModel>()
+const viewStates = new Map<string, monaco.editor.ICodeEditorViewState | null>()
+
+function modelFor(fileKey: string, filename: string, content: string): monaco.editor.ITextModel {
+  let m = models.get(fileKey)
+  if (!m || m.isDisposed()) {
+    const lang = languageForFilename(filename)
+    const uri = monaco.Uri.parse(`inmemory://file/${encodeURIComponent(fileKey)}`)
+    m = monaco.editor.createModel(content, lang, uri)
+    models.set(fileKey, m)
+  }
+  return m
+}
+
+export function disposeMonacoModel(fileKey: string): void {
+  models.get(fileKey)?.dispose()
+  models.delete(fileKey)
+  viewStates.delete(fileKey)
+}
+
+function optionsFrom(s: EditorSettings): monaco.editor.IStandaloneEditorConstructionOptions {
+  return {
+    fontSize: s.fontSize,
+    fontFamily: s.fontFamily,
+    tabSize: s.tabSize,
+    insertSpaces: s.insertSpaces,
+    wordWrap: s.wordWrap ? 'on' : 'off',
+    lineNumbers: s.lineNumbers ? 'on' : 'off',
+    minimap: { enabled: s.minimap },
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+  }
+}
+
+export function MonacoEditor({ fileKey, filename, initialContent, onChange, onSave, format, readOnly }: Props) {
+  const hostRef = useRef<HTMLDivElement | null>(null)
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+  const currentKeyRef = useRef<string | null>(null)
+  const onChangeRef = useRef(onChange)
+  const onSaveRef = useRef(onSave)
+  const formatRef = useRef(format)
+  useEffect(() => {
+    onChangeRef.current = onChange
+    onSaveRef.current = onSave
+    formatRef.current = format
+  })
+
+  const settings = useSettings((s) => s.editor)
+  const { theme } = useTheme()
+
+  // Create the editor once (recreate only when readOnly flips).
+  useEffect(() => {
+    if (!hostRef.current) return
+    ensureThemes()
+    const editor = monaco.editor.create(hostRef.current, {
+      ...optionsFrom(useSettings.getState().editor),
+      theme: 'wterm-dark',
+      readOnly,
+    })
+    editorRef.current = editor
+    const sub = editor.onDidChangeModelContent(() => onChangeRef.current(editor.getValue()))
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      const run = (text: string) => onSaveRef.current(text)
+      const fmt = formatRef.current
+      if (fmt) {
+        void fmt(editor.getValue()).then((f) => {
+          if (f && f !== editor.getValue()) editor.setValue(f)
+          run(editor.getValue())
+        })
+      } else {
+        run(editor.getValue())
+      }
+    })
+    return () => {
+      sub.dispose()
+      editor.dispose()
+      editorRef.current = null
+      currentKeyRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly])
+
+  // Swap model when the open file changes, preserving view state. Depends only on
+  // fileKey so it does NOT re-run on every keystroke (initialContent/filename are
+  // read only when the model is first created).
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const prevKey = currentKeyRef.current
+    if (prevKey && prevKey !== fileKey) viewStates.set(prevKey, editor.saveViewState())
+    const model = modelFor(fileKey, filename, initialContent)
+    if (editor.getModel() !== model) editor.setModel(model)
+    const vs = viewStates.get(fileKey)
+    if (vs) editor.restoreViewState(vs)
+    currentKeyRef.current = fileKey
+    editor.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileKey])
+
+  // React to settings changes without recreating the editor.
+  useEffect(() => {
+    editorRef.current?.updateOptions(optionsFrom(settings))
+  }, [settings])
+
+  // React to theme changes.
+  useEffect(() => {
+    monaco.editor.setTheme('wterm-dark')
+    void theme
+  }, [theme])
+
+  return <div ref={hostRef} className="h-full w-full overflow-hidden" />
+}
