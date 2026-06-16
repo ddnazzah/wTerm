@@ -30,16 +30,20 @@ function modelFor(fileKey: string, filename: string, content: string): monaco.ed
   return m
 }
 
+// Keys whose model is currently set on a mounted editor. Guards against GC
+// disposing a model the editor still holds (e.g. mid-remount on a mode switch).
+const attachedKeys = new Set<string>()
+
 export function disposeMonacoModel(fileKey: string): void {
   models.get(fileKey)?.dispose()
   models.delete(fileKey)
   viewStates.delete(fileKey)
 }
 
-/** Dispose models whose fileKey is no longer open. */
+/** Dispose models whose fileKey is no longer open and not attached to an editor. */
 export function gcMonacoModels(liveKeys: Set<string>): void {
   for (const key of models.keys()) {
-    if (!liveKeys.has(key)) disposeMonacoModel(key)
+    if (!liveKeys.has(key) && !attachedKeys.has(key)) disposeMonacoModel(key)
   }
 }
 
@@ -89,7 +93,12 @@ export function MonacoEditor({ fileKey, filename, initialContent, onChange, onSa
       const fmt = formatRef.current
       if (fmt) {
         void fmt(editor.getValue()).then((f) => {
-          if (f && f !== editor.getValue()) editor.setValue(f)
+          const model = editor.getModel()
+          if (f && model && f !== model.getValue()) {
+            // Replace via executeEdits (not setValue) to preserve undo history + cursor.
+            editor.executeEdits('format', [{ range: model.getFullModelRange(), text: f }])
+            editor.pushUndoStop()
+          }
           run(editor.getValue())
         })
       } else {
@@ -100,6 +109,7 @@ export function MonacoEditor({ fileKey, filename, initialContent, onChange, onSa
       sub.dispose()
       editor.dispose()
       editorRef.current = null
+      if (currentKeyRef.current) attachedKeys.delete(currentKeyRef.current)
       currentKeyRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,12 +122,16 @@ export function MonacoEditor({ fileKey, filename, initialContent, onChange, onSa
     const editor = editorRef.current
     if (!editor) return
     const prevKey = currentKeyRef.current
-    if (prevKey && prevKey !== fileKey) viewStates.set(prevKey, editor.saveViewState())
+    if (prevKey && prevKey !== fileKey) {
+      viewStates.set(prevKey, editor.saveViewState())
+      attachedKeys.delete(prevKey)
+    }
     const model = modelFor(fileKey, filename, initialContent)
     if (editor.getModel() !== model) editor.setModel(model)
     const vs = viewStates.get(fileKey)
     if (vs) editor.restoreViewState(vs)
     currentKeyRef.current = fileKey
+    attachedKeys.add(fileKey)
     editor.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileKey])
