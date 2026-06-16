@@ -34,6 +34,7 @@ export default function App() {
   const openFiles = useWorkspace((s) => s.openFiles)
   const editorViewMode = useWorkspace((s) => s.editorViewMode)
   const closeFile = useWorkspace((s) => s.closeFile)
+  const activeFileByProject = useWorkspace((s) => s.activeFileByProject)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Toggle the Home terminal dock. Opening with no Home terminals starts one by
@@ -132,6 +133,19 @@ export default function App() {
 
       if (!selectedProject) return
 
+      // ⌘W closes the focused file tab; otherwise it falls through to closing the terminal.
+      if (e.key === 'w' && document.activeElement?.closest('[data-editor-surface]')) {
+        const active = activeFileByProject[selectedProject.id]
+        const file = openFiles.find(
+          (f) => f.projectId === selectedProject.id && f.path === active
+        )
+        if (file) {
+          e.preventDefault()
+          closeFile(file)
+          return
+        }
+      }
+
       if (e.key === 't') {
         e.preventDefault()
         void createProjectTerminal(selectedProject.id)
@@ -151,6 +165,9 @@ export default function App() {
     toggleSidebar,
     toggleRightSidebar,
     toggleHomeTerminal,
+    openFiles,
+    closeFile,
+    activeFileByProject,
   ])
 
   const handleBell = useCallback(
