@@ -3,7 +3,7 @@ import { MAX_TEXT_FILE_LABEL } from '@shared/types'
 import { tabKey, useWorkspace, type OpenedFile } from '@renderer/state/store'
 import { useSettings } from '@renderer/state/settings'
 import { formattableParser, formatText } from '@renderer/lib/formatter'
-import { CodeEditor } from './code-editor'
+import { MonacoEditor, gcMonacoModels } from './monaco-editor'
 import { MarkdownPreview } from './markdown-preview'
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'])
@@ -61,6 +61,12 @@ export function FileViewer({ projectId }: Props) {
     },
     [markFileSaved]
   )
+
+  // Dispose Monaco models for files that are no longer open (any project).
+  useEffect(() => {
+    const live = new Set(openFiles.map(tabKey))
+    gcMonacoModels(live)
+  }, [openFiles])
 
   if (projectTabs.length === 0) return null
 
@@ -126,7 +132,7 @@ function EditorPane({
     : undefined
 
   return (
-    <CodeEditor
+    <MonacoEditor
       fileKey={tabKey(file)}
       filename={name}
       initialContent={state.current}
@@ -182,7 +188,7 @@ function MarkdownPane({
         {mode === 'preview' ? (
           <MarkdownPreview content={content} />
         ) : (
-          <CodeEditor
+          <MonacoEditor
             fileKey={fileKey}
             filename={name}
             initialContent={content}

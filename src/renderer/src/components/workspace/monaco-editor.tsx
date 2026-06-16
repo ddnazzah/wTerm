@@ -36,6 +36,13 @@ export function disposeMonacoModel(fileKey: string): void {
   viewStates.delete(fileKey)
 }
 
+/** Dispose models whose fileKey is no longer open. */
+export function gcMonacoModels(liveKeys: Set<string>): void {
+  for (const key of models.keys()) {
+    if (!liveKeys.has(key)) disposeMonacoModel(key)
+  }
+}
+
 function optionsFrom(s: EditorSettings): monaco.editor.IStandaloneEditorConstructionOptions {
   return {
     fontSize: s.fontSize,
