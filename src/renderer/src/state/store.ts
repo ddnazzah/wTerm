@@ -18,6 +18,20 @@ const BOTTOM_PANEL_OPEN_KEY = 'tw:bottom-panel-open'
 const BOTTOM_PANEL_HEIGHT_KEY = 'tw:bottom-panel-height'
 const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
 const FILE_MODAL_SIZE_KEY = 'tw:file-modal-size'
+const EDITOR_VIEW_MODE_KEY = 'tw:editor-view-mode'
+const DOCK_SPLIT_KEY = 'tw:dock-split-ratio'
+
+export type EditorViewMode = 'docked' | 'modal' | 'fullscreen'
+
+const readEditorViewMode = (): EditorViewMode => {
+  const raw = localStorage.getItem(EDITOR_VIEW_MODE_KEY)
+  return raw === 'modal' || raw === 'fullscreen' || raw === 'docked' ? raw : 'docked'
+}
+
+const readDockSplitRatio = (): number => {
+  const n = Number.parseFloat(localStorage.getItem(DOCK_SPLIT_KEY) ?? '')
+  return Number.isFinite(n) && n > 0.15 && n < 0.85 ? n : 0.6
+}
 
 const readInitialFileModalSize = (): { width: number; height: number } => {
   try {
@@ -168,6 +182,12 @@ interface WorkspaceState {
   closeFileModal: () => void
   setFileModalSize: (width: number, height: number) => void
 
+  editorViewMode: EditorViewMode
+  setEditorViewMode: (m: EditorViewMode) => void
+  dockSplitRatio: number
+  setDockSplitRatio: (r: number) => void
+  reorderFile: (projectId: string, from: number, to: number) => void
+
   openFile: (file: OpenedFile) => void
   closeFile: (file: OpenedFile) => void
   setActiveFile: (projectId: string, path: string | null) => void
@@ -306,6 +326,28 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       // ignore
     }
   },
+
+  editorViewMode: readEditorViewMode(),
+  setEditorViewMode: (m) => {
+    localStorage.setItem(EDITOR_VIEW_MODE_KEY, m)
+    set({ editorViewMode: m })
+  },
+  dockSplitRatio: readDockSplitRatio(),
+  setDockSplitRatio: (r) => {
+    const clamped = Math.min(0.85, Math.max(0.15, r))
+    localStorage.setItem(DOCK_SPLIT_KEY, String(clamped))
+    set({ dockSplitRatio: clamped })
+  },
+  reorderFile: (projectId, from, to) =>
+    set((state) => {
+      const proj = state.openFiles.filter((f) => f.projectId === projectId)
+      const others = state.openFiles.filter((f) => f.projectId !== projectId)
+      if (from < 0 || to < 0 || from >= proj.length || to >= proj.length) return {}
+      const next = [...proj]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return { openFiles: [...others, ...next] }
+    }),
 
   openFiles: [],
   activeFileByProject: {},
