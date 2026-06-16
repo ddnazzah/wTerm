@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { tabKey, useWorkspace, type OpenedFile } from '@renderer/state/store'
 import { FileIcon } from '../right-sidebar/file-icon'
 
@@ -12,12 +12,26 @@ export function FileTabs({ projectId }: Props) {
   const activeFileByProject = useWorkspace((s) => s.activeFileByProject)
   const setActiveFile = useWorkspace((s) => s.setActiveFile)
   const closeFile = useWorkspace((s) => s.closeFile)
+  const reorderFile = useWorkspace((s) => s.reorderFile)
 
   const projectTabs = useMemo(
     () => openFiles.filter((f) => f.projectId === projectId),
     [openFiles, projectId]
   )
   const activePath = activeFileByProject[projectId] ?? null
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey)) return
+      const n = Number.parseInt(e.key, 10)
+      if (Number.isInteger(n) && n >= 1 && n <= 9 && projectTabs[n - 1]) {
+        e.preventDefault()
+        setActiveFile(projectId, projectTabs[n - 1].path)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [projectTabs, projectId, setActiveFile])
 
   const closeWithConfirm = useCallback(
     (file: OpenedFile) => {
@@ -34,6 +48,8 @@ export function FileTabs({ projectId }: Props) {
     [fileStates, closeFile]
   )
 
+  const dragIndex = useRef<number | null>(null)
+
   if (projectTabs.length === 0) return null
 
   return (
@@ -41,7 +57,7 @@ export function FileTabs({ projectId }: Props) {
       className="flex items-stretch h-full min-w-0 overflow-x-auto"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
-      {projectTabs.map((file) => {
+      {projectTabs.map((file, i) => {
         const isActive = file.path === activePath
         const name = file.path.split('/').pop() ?? file.path
         const state = fileStates[tabKey(file)]
@@ -55,6 +71,15 @@ export function FileTabs({ projectId }: Props) {
                 ? 'bg-background text-foreground'
                 : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
             ].join(' ')}
+            draggable
+            onDragStart={() => (dragIndex.current = i)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => {
+              if (dragIndex.current !== null && dragIndex.current !== i) {
+                reorderFile(projectId, dragIndex.current, i)
+              }
+              dragIndex.current = null
+            }}
             onClick={() => setActiveFile(projectId, file.path)}
             onMouseDown={(e) => {
               if (e.button === 1) {
