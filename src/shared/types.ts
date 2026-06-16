@@ -1,6 +1,9 @@
 export type ProjectId = string
 export type TerminalId = string
 
+/** Reserved id of the synthesized "Home" workspace that holds project-less terminals. */
+export const HOME_PROJECT_ID = 'home'
+
 /** Largest file (in bytes) the in-app editor will load as text. */
 export const MAX_TEXT_FILE_BYTES = 5 * 1024 * 1024
 
@@ -19,6 +22,8 @@ export interface Project {
   path: string
   color: string
   terminals: TerminalRecord[]
+  /** True only for the synthesized Home workspace; never persisted. */
+  isDefault?: boolean
 }
 
 export interface AppState {
@@ -96,6 +101,7 @@ export const IPC = {
   git: {
     info: 'git:info',
     push: 'git:push',
+    fileStatus: 'git:file-status',
   },
   github: {
     getSettings: 'github:get-settings',
@@ -174,6 +180,9 @@ export interface GitInfo {
   /** the configured default branch on origin (HEAD), or null */
   defaultBranch: string | null
 }
+
+export type GitFileStatus = 'modified' | 'added' | 'deleted' | 'untracked' | 'conflict'
+export type GitFileStatusMap = Record<string, GitFileStatus>
 
 // ---- GitHub ----
 
