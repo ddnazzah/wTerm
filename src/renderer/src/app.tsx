@@ -8,11 +8,11 @@ import { SettingsModal } from './components/settings-modal'
 import { UpdateBanner } from './components/update-banner'
 import { TopBar } from './components/top-bar'
 import { StatusBar } from './components/status-bar'
-import { TerminalTabs } from './components/workspace/terminal-tabs'
 import { FileModal } from './components/workspace/file-modal'
+import { BottomPanel } from './components/workspace/bottom-panel'
 import { useProjects } from './hooks/use-projects'
 import { createProjectTerminal, useWorkspace } from './state/store'
-import type { Project, TerminalRecord } from '@shared/types'
+import { HOME_PROJECT_ID, type Project, type TerminalRecord } from '@shared/types'
 
 export default function App() {
   const { projects, selectedProject, addProject } = useProjects()
@@ -28,8 +28,23 @@ export default function App() {
   const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
   const rightSidebarCollapsed = useWorkspace((s) => s.rightSidebarCollapsed)
   const toggleRightSidebar = useWorkspace((s) => s.toggleRightSidebar)
+  const bottomPanelOpen = useWorkspace((s) => s.bottomPanelOpen)
+  const setBottomPanelOpen = useWorkspace((s) => s.setBottomPanelOpen)
   const openFiles = useWorkspace((s) => s.openFiles)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  // Toggle the Home terminal dock. Opening with no Home terminals starts one by
+  // default so you always land in a live shell.
+  const toggleHomeTerminal = useCallback(() => {
+    const open = !useWorkspace.getState().bottomPanelOpen
+    setBottomPanelOpen(open)
+    if (open) {
+      const homeProject = useWorkspace.getState().projects.find((p) => p.id === HOME_PROJECT_ID)
+      if (homeProject && homeProject.terminals.length === 0) {
+        void createProjectTerminal(HOME_PROJECT_ID)
+      }
+    }
+  }, [setBottomPanelOpen])
 
   const pendingFocusRef = useRef<{ projectId: string; terminalId: string } | null>(null)
 
@@ -45,6 +60,16 @@ export default function App() {
   const allTerminals = useMemo(
     () => projects.flatMap((p) => p.terminals.map((t) => ({ ...t, project: p }))),
     [projects]
+  )
+
+  // Home (project-less) terminals render in the bottom dock, not the center.
+  const home = useMemo(
+    () => projects.find((p) => p.id === HOME_PROJECT_ID) ?? null,
+    [projects]
+  )
+  const centerTerminals = useMemo(
+    () => allTerminals.filter((t) => t.project.id !== HOME_PROJECT_ID),
+    [allTerminals]
   )
 
   useEffect(() => {
@@ -96,6 +121,12 @@ export default function App() {
         return
       }
 
+      if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault()
+        toggleHomeTerminal()
+        return
+      }
+
       if (!selectedProject) return
 
       if (e.key === 't') {
@@ -116,6 +147,7 @@ export default function App() {
     activeTerminalId,
     toggleSidebar,
     toggleRightSidebar,
+    toggleHomeTerminal,
   ])
 
   const handleBell = useCallback(
@@ -177,40 +209,44 @@ export default function App() {
           if (selectedProject) void createProjectTerminal(selectedProject.id)
         }}
         newSessionDisabled={!selectedProject}
+        terminalOpen={bottomPanelOpen}
+        onToggleTerminal={toggleHomeTerminal}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <div className="flex flex-1 min-h-0 gap-1.5 py-1.5">
         {!sidebarCollapsed && <ProjectList />}
-        <main className="flex-1 flex flex-col min-w-0">
-          <div className="flex flex-col h-full rounded-lg bg-background overflow-hidden">
-            {selectedProject && selectedProject.terminals.length > 0 && (
-              <TerminalTabs project={selectedProject} />
-            )}
-
-            <div className="@container relative flex-1 min-w-0 overflow-hidden">
-              {allTerminals.map((t) => (
-                <TerminalPane
-                  key={t.id}
-                  terminalId={t.id}
-                  active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
-                  onBell={(kind) => handleBell(t.project, t, kind)}
-                />
-              ))}
-              {showEmptyNoProject && (
-                <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
-              )}
-              {showEmptyNoTerminals && (
-                <EmptyState
-                  hasSelection
-                  onCreateTerminal={() => {
-                    if (!selectedProject) return
-                    void createProjectTerminal(selectedProject.id)
-                  }}
-                />
-              )}
-            </div>
+        <div className="flex flex-col flex-1 min-w-0 gap-1.5">
+          <div className="flex flex-1 min-h-0 gap-1.5">
+            <main className="flex-1 flex flex-col min-w-0">
+              <div className="flex flex-col h-full rounded-lg bg-background overflow-hidden">
+                <div className="@container relative flex-1 min-w-0 overflow-hidden">
+                  {centerTerminals.map((t) => (
+                    <TerminalPane
+                      key={t.id}
+                      terminalId={t.id}
+                      active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
+                      onBell={(kind) => handleBell(t.project, t, kind)}
+                    />
+                  ))}
+                  {showEmptyNoProject && (
+                    <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
+                  )}
+                  {showEmptyNoTerminals && (
+                    <EmptyState
+                      hasSelection
+                      onCreateTerminal={() => {
+                        if (!selectedProject) return
+                        void createProjectTerminal(selectedProject.id)
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            </main>
+            {selectedProject && !rightSidebarCollapsed && <RightSidebar project={selectedProject} />}
           </div>
-        </main>
-        {selectedProject && !rightSidebarCollapsed && <RightSidebar project={selectedProject} />}
+          {home && <BottomPanel home={home} onBell={handleBell} />}
+        </div>
         <RightActivityBar
           onOpenSettings={() => setSettingsOpen(true)}
           panelDisabled={!selectedProject}

@@ -14,6 +14,9 @@ export function ProjectList() {
   const sidebarWidth = useWorkspace((s) => s.sidebarWidth)
   const setSidebarWidth = useWorkspace((s) => s.setSidebarWidth)
 
+  // The Home workspace lives in the bottom terminal dock, not the project list.
+  const userProjects = projects.filter((p) => !p.isDefault)
+
   const draggingRef = useRef(false)
 
   const handlePointerDown = useCallback(
@@ -67,13 +70,13 @@ export function ProjectList() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-2">
-        {projects.length === 0 ? (
+        {userProjects.length === 0 ? (
           <div className="text-xs text-foreground/40 px-2 py-6 text-center">
             No projects yet.
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {projects.map((p) => (
+            {userProjects.map((p) => (
               <ProjectItem
                 key={p.id}
                 project={p}

@@ -1,9 +1,28 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import type { AppState, Project, ProjectId, TerminalRecord } from '@shared/types'
+import { HOME_PROJECT_ID, type AppState, type Project, type ProjectId, type TerminalRecord } from '@shared/types'
 
 const SAVE_DEBOUNCE_MS = 500
+
+/**
+ * Ensure the synthesized "Home" workspace sits at the front of the project list.
+ * Home holds project-less terminals, always exists, starts in the OS home dir,
+ * and is stripped before persisting (see {@link writeFile}) so it never drifts,
+ * duplicates, or leaks into state.json.
+ */
+function ensureHome(projects: Project[]): Project[] {
+  if (projects.some((p) => p.id === HOME_PROJECT_ID)) return projects
+  const home: Project = {
+    id: HOME_PROJECT_ID,
+    name: 'Home',
+    path: app.getPath('home'),
+    color: '#5ccfe6',
+    terminals: [],
+    isDefault: true,
+  }
+  return [home, ...projects]
+}
 
 let cache: AppState = {
   version: 1,
@@ -38,6 +57,7 @@ export async function loadState(): Promise<AppState> {
       console.error('[state] failed to load:', err)
     }
   }
+  cache.projects = ensureHome(cache.projects)
   return cache
 }
 
@@ -76,7 +96,9 @@ async function writeFile(): Promise<void> {
   // the now-meaningless active-tab map) stripped out.
   const persisted: AppState = {
     ...cache,
-    projects: cache.projects.map((p) => ({ ...p, terminals: [] })),
+    projects: cache.projects
+      .filter((p) => !p.isDefault)
+      .map((p) => ({ ...p, terminals: [] })),
     activeTerminalByProject: {},
   }
   const json = JSON.stringify(persisted, null, 2)

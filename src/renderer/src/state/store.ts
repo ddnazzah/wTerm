@@ -14,6 +14,8 @@ const SIDEBAR_WIDTH_KEY = 'tw:sidebar-width'
 const SIDEBAR_COLLAPSED_KEY = 'tw:sidebar-collapsed'
 const RIGHT_SIDEBAR_WIDTH_KEY = 'tw:right-sidebar-width'
 const RIGHT_SIDEBAR_COLLAPSED_KEY = 'tw:right-sidebar-collapsed'
+const BOTTOM_PANEL_OPEN_KEY = 'tw:bottom-panel-open'
+const BOTTOM_PANEL_HEIGHT_KEY = 'tw:bottom-panel-height'
 const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
 const FILE_MODAL_SIZE_KEY = 'tw:file-modal-size'
 
@@ -89,6 +91,32 @@ const readInitialRightSidebarCollapsed = (): boolean => {
   }
 }
 
+export const BOTTOM_PANEL_MIN_HEIGHT = 120
+export const BOTTOM_PANEL_MAX_HEIGHT = 800
+const BOTTOM_PANEL_DEFAULT_HEIGHT = 260
+
+const clampBottomPanelHeight = (h: number): number =>
+  Math.min(BOTTOM_PANEL_MAX_HEIGHT, Math.max(BOTTOM_PANEL_MIN_HEIGHT, Math.round(h)))
+
+const readInitialBottomPanelHeight = (): number => {
+  try {
+    const raw = localStorage.getItem(BOTTOM_PANEL_HEIGHT_KEY)
+    const n = raw ? Number.parseInt(raw, 10) : NaN
+    return Number.isFinite(n) ? clampBottomPanelHeight(n) : BOTTOM_PANEL_DEFAULT_HEIGHT
+  } catch {
+    return BOTTOM_PANEL_DEFAULT_HEIGHT
+  }
+}
+
+const readInitialBottomPanelOpen = (): boolean => {
+  try {
+    // default to CLOSED; explicit '1' means open
+    return localStorage.getItem(BOTTOM_PANEL_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 const readInitialRightSidebarTab = (): RightSidebarTab => {
   try {
     const raw = localStorage.getItem(RIGHT_SIDEBAR_TAB_KEY)
@@ -119,6 +147,12 @@ interface WorkspaceState {
   setRightSidebarWidth: (width: number) => void
   setRightSidebarCollapsed: (collapsed: boolean) => void
   toggleRightSidebar: () => void
+
+  bottomPanelOpen: boolean
+  bottomPanelHeight: number
+  toggleBottomPanel: () => void
+  setBottomPanelOpen: (open: boolean) => void
+  setBottomPanelHeight: (height: number) => void
   setRightSidebarTab: (tab: RightSidebarTab) => void
 
   openFiles: OpenedFile[]
@@ -185,6 +219,9 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   rightSidebarCollapsed: readInitialRightSidebarCollapsed(),
   rightSidebarTab: readInitialRightSidebarTab(),
 
+  bottomPanelOpen: readInitialBottomPanelOpen(),
+  bottomPanelHeight: readInitialBottomPanelHeight(),
+
   setRightSidebarWidth: (width) => {
     const next = clampRightSidebarWidth(width)
     set({ rightSidebarWidth: next })
@@ -219,6 +256,36 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     set({ rightSidebarTab: tab })
     try {
       localStorage.setItem(RIGHT_SIDEBAR_TAB_KEY, tab)
+    } catch {
+      // ignore
+    }
+  },
+
+  setBottomPanelOpen: (open) => {
+    set({ bottomPanelOpen: open })
+    try {
+      localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, open ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  },
+
+  toggleBottomPanel: () =>
+    set((state) => {
+      const next = !state.bottomPanelOpen
+      try {
+        localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, next ? '1' : '0')
+      } catch {
+        // ignore
+      }
+      return { bottomPanelOpen: next }
+    }),
+
+  setBottomPanelHeight: (height) => {
+    const next = clampBottomPanelHeight(height)
+    set({ bottomPanelHeight: next })
+    try {
+      localStorage.setItem(BOTTOM_PANEL_HEIGHT_KEY, String(next))
     } catch {
       // ignore
     }

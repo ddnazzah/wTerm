@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { isMac, isWindows } from '@renderer/lib/platform'
 
 interface Props {
@@ -6,15 +7,35 @@ interface Props {
   onToggleSidebar: () => void
   onNewSession: () => void
   newSessionDisabled?: boolean
+  /** Whether the Home terminal dock is open (drives the trigger's active state). */
+  terminalOpen: boolean
+  onToggleTerminal: () => void
+  onOpenSettings: () => void
 }
 
 /**
- * Full-width top bar (the app's title chrome). Left: sidebar toggle. Center: a
- * search-like input showing the current session (project/terminal) with a New
- * action to start another terminal. Sits on the base background; the panes
- * below float as cards over the same background.
+ * Full-width top bar. Left: sidebar toggle. Center: a search-like input showing
+ * the current session with a New action. Right: the Home-terminal trigger and
+ * the GitHub profile.
  */
-export function TopBar({ label, onToggleSidebar, onNewSession, newSessionDisabled = false }: Props) {
+export function TopBar({
+  label,
+  onToggleSidebar,
+  onNewSession,
+  newSessionDisabled = false,
+  terminalOpen,
+  onToggleTerminal,
+  onOpenSettings,
+}: Props) {
+  const [login, setLogin] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.api.github
+      .getSettings()
+      .then((s) => setLogin(s.login))
+      .catch(() => setLogin(null))
+  }, [])
+
   return (
     <header
       className={`app-titlebar relative flex items-center h-11 px-3 gap-2 flex-shrink-0 ${
@@ -64,7 +85,48 @@ export function TopBar({ label, onToggleSidebar, onNewSession, newSessionDisable
         </div>
       </div>
 
-      <div className="w-7 flex-shrink-0" aria-hidden />
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onToggleTerminal}
+          aria-label="Toggle terminal"
+          aria-pressed={terminalOpen}
+          title="Terminal (⌘J)"
+          className={[
+            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
+            terminalOpen
+              ? 'text-foreground bg-foreground/10'
+              : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
+          ].join(' ')}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label={login ? `GitHub: ${login}` : 'GitHub account'}
+          title={login ? `GitHub: ${login}` : 'Connect GitHub'}
+          className="flex items-center justify-center w-7 h-7 rounded-full overflow-hidden text-foreground/55 hover:text-foreground hover:bg-foreground/10 transition-colors"
+        >
+          {login ? (
+            <img
+              src={`https://github.com/${login}.png?size=44`}
+              alt={login}
+              className="w-[22px] h-[22px] rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0 1 16 0" />
+            </svg>
+          )}
+        </button>
+      </div>
     </header>
   )
 }
