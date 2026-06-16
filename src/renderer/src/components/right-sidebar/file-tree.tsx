@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FsEntry, GitFileStatus, GitFileStatusMap, Project } from '@shared/types'
 import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { FileIcon } from './file-icon'
@@ -26,6 +26,13 @@ export function FileTree({ project }: Props) {
     kind: 'file' | 'folder'
   } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const typeAhead = useRef<{ buffer: string; at: number }>({ buffer: '', at: 0 })
+
+  const visibleRows = useMemo(
+    () => flattenVisible(rootEntries, children, expanded),
+    [rootEntries, children, expanded]
+  )
 
   const reloadRoot = useCallback(async () => {
     setLoading(true)
@@ -189,6 +196,77 @@ export function FileTree({ project }: Props) {
     [project.id, reloadFolder, reloadGit]
   )
 
+  const onTreeKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (renaming || creatingAt) return
+      const idx = visibleRows.findIndex((r) => r.path === selected)
+      const cur = idx >= 0 ? visibleRows[idx] : null
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelected(visibleRows[Math.min(visibleRows.length - 1, idx + 1)]?.path ?? selected)
+          return
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelected(visibleRows[Math.max(0, idx - 1)]?.path ?? selected)
+          return
+        case 'ArrowRight':
+          if (cur?.isDirectory && !expanded[cur.path]) {
+            e.preventDefault()
+            void toggle(cur)
+          }
+          return
+        case 'ArrowLeft':
+          if (cur?.isDirectory && expanded[cur.path]) {
+            e.preventDefault()
+            void toggle(cur)
+          }
+          return
+        case 'Enter':
+          if (cur) {
+            e.preventDefault()
+            if (cur.isDirectory) void toggle(cur)
+            else openFile({ projectId: project.id, path: cur.path })
+          }
+          return
+        case 'F2':
+          if (cur) {
+            e.preventDefault()
+            setRenaming(cur.path)
+          }
+          return
+        case 'Delete':
+        case 'Backspace':
+          if (cur && (e.key === 'Delete' || e.metaKey)) {
+            e.preventDefault()
+            void handleAction(cur, 'delete')
+          }
+          return
+      }
+      if ((e.key === 'n' || e.key === 'N') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        void handleAction(cur, 'new-file')
+        return
+      }
+      // Type-ahead: jump to next visible row whose name starts with the typed buffer.
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const now = Date.now()
+        const ta = typeAhead.current
+        ta.buffer = now - ta.at > 600 ? e.key : ta.buffer + e.key
+        ta.at = now
+        const lower = ta.buffer.toLowerCase()
+        const startFrom = idx >= 0 ? idx : 0
+        const order = [
+          ...visibleRows.slice(startFrom + 1),
+          ...visibleRows.slice(0, startFrom + 1),
+        ]
+        const hit = order.find((r) => r.name.toLowerCase().startsWith(lower))
+        if (hit) setSelected(hit.path)
+      }
+    },
+    [renaming, creatingAt, visibleRows, selected, expanded, toggle, openFile, project.id, handleAction]
+  )
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-accent/7">
@@ -226,7 +304,9 @@ export function FileTree({ project }: Props) {
       </div>
 
       <div
-        className="flex-1 min-h-0 overflow-y-auto py-1 text-[13px]"
+        tabIndex={0}
+        onKeyDown={onTreeKey}
+        className="flex-1 min-h-0 overflow-y-auto py-1 text-[13px] outline-none"
         onContextMenu={(e) => {
           e.preventDefault()
           setMenu({ x: e.clientX, y: e.clientY, target: null })
@@ -254,10 +334,12 @@ export function FileTree({ project }: Props) {
             expanded={expanded}
             children_={children}
             gitStatus={gitStatus}
+            selected={selected}
             renaming={renaming}
             creatingAt={creatingAt}
             onToggle={toggle}
             onOpen={(e) => {
+              setSelected(e.path)
               if (e.isDirectory) void toggle(e)
               else openFile({ projectId: project.id, path: e.path })
             }}
@@ -321,6 +403,7 @@ interface TreeRowProps {
   expanded: Record<string, boolean>
   children_: ChildrenMap
   gitStatus: GitFileStatusMap
+  selected: string | null
   renaming: string | null
   creatingAt: { parent: string; kind: 'file' | 'folder' } | null
   activePath: string | null
@@ -339,6 +422,7 @@ function TreeRow({
   expanded,
   children_,
   gitStatus,
+  selected,
   renaming,
   creatingAt,
   activePath,
@@ -353,6 +437,7 @@ function TreeRow({
   const isOpen = !!expanded[entry.path]
   const kids = children_[entry.path]
   const isActive = !entry.isDirectory && activePath === entry.path
+  const isSelected = entry.path === selected
   const status = entry.isDirectory
     ? folderStatus(entry.path, gitStatus)
     : gitStatus[entry.path]
@@ -376,6 +461,7 @@ function TreeRow({
           className={[
             'group/row flex items-center w-full pr-2 py-[3px] text-left',
             isActive ? 'bg-foreground/10' : 'hover:bg-foreground/5',
+            isSelected ? 'ring-1 ring-inset ring-accent/40' : '',
           ].join(' ')}
           style={{ paddingLeft: 8 + depth * 12 }}
         >
@@ -444,6 +530,7 @@ function TreeRow({
                 expanded={expanded}
                 children_={children_}
                 gitStatus={gitStatus}
+                selected={selected}
                 renaming={renaming}
                 creatingAt={creatingAt}
                 activePath={activePath}
@@ -647,6 +734,25 @@ function MenuDivider() {
 function parentOf(p: string): string {
   const i = p.lastIndexOf('/')
   return i < 0 ? '' : p.slice(0, i)
+}
+
+function flattenVisible(
+  roots: FsEntry[],
+  children: ChildrenMap,
+  expanded: Record<string, boolean>
+): FsEntry[] {
+  const out: FsEntry[] = []
+  const walk = (entries: FsEntry[]): void => {
+    for (const e of entries) {
+      out.push(e)
+      if (e.isDirectory && expanded[e.path]) {
+        const kids = children[e.path]
+        if (kids) walk(kids)
+      }
+    }
+  }
+  walk(roots)
+  return out
 }
 
 function statusColor(s?: GitFileStatus): string | undefined {
