@@ -20,7 +20,7 @@ export function TerminalTabs({ project }: Props) {
   }
 
   return (
-    <div className="flex items-stretch h-9 min-w-0 overflow-x-auto border-b border-accent/14 bg-surface/40">
+    <div className="flex items-stretch h-9 min-w-0 overflow-x-auto">
       {project.terminals.map((t) => {
         const isActive = t.id === activeId
         const name = titleByTerminal[t.id] || t.name
@@ -31,8 +31,8 @@ export function TerminalTabs({ project }: Props) {
             key={t.id}
             onClick={() => setActive(project.id, t.id)}
             className={[
-              'group/tt relative flex items-center gap-1.5 pl-3 pr-2 text-[12px] cursor-pointer border-r border-accent/14 transition-colors min-w-0 flex-shrink-0',
-              isActive ? 'bg-background text-foreground' : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
+              'group/tt relative flex items-center gap-1.5 pl-3 pr-2 text-[12px] cursor-pointer transition-colors min-w-0 flex-shrink-0',
+              isActive ? 'bg-foreground/8 text-foreground' : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
               busy ? 'terminal-item-busy' : '',
             ].join(' ')}
             title={name}
@@ -51,7 +51,6 @@ export function TerminalTabs({ project }: Props) {
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
-            {isActive && <span aria-hidden className="absolute bottom-0 left-0 right-0 h-px bg-foreground" />}
           </div>
         )
       })}

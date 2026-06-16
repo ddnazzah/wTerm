@@ -61,17 +61,19 @@ export function RightSidebar({ project }: Props) {
 
   return (
     <aside
-      className="relative flex flex-col h-full flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm"
+      className="relative flex flex-shrink-0 h-full"
       style={{ width, minWidth: RIGHT_SIDEBAR_MIN_WIDTH, maxWidth: RIGHT_SIDEBAR_MAX_WIDTH }}
     >
-      <header className="app-titlebar h-11 flex items-center px-4 border-b border-accent/14">
-        <span className="text-[10px] uppercase tracking-wider text-foreground/55 font-medium">
-          {tab === 'files' ? 'Files' : 'Source Control'}
-        </span>
-      </header>
+      <div className="flex flex-col h-full w-full rounded-lg bg-background overflow-hidden">
+        <header className="app-titlebar h-11 flex items-center px-4">
+          <span className="text-[10px] uppercase tracking-wider text-foreground/55 font-medium">
+            {tab === 'files' ? 'Files' : 'Source Control'}
+          </span>
+        </header>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        {tab === 'files' ? <FileTree project={project} /> : <GitPanel project={project} />}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {tab === 'files' ? <FileTree project={project} /> : <GitPanel project={project} />}
+        </div>
       </div>
 
       <div

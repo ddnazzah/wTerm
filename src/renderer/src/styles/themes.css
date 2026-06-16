@@ -8,9 +8,10 @@
 }
 
 @layer base {
-  /* Halcyon — port of bchiang7/halcyon-vscode.
+  /* Halcyon — port of bchiang7/halcyon-vscode (Brittany Chiang).
      Deep navy chrome (#171c28), slightly lighter editor surface (#1d2433),
-     muted blue-gray foreground (#a2aabc), yellow accent (#ffcc66). */
+     muted blue-gray foreground (#a2aabc), yellow accent (#ffcc66).
+     Palette verified against the upstream repo's documented color table. */
   [data-theme='halcyon'] {
     color-scheme: dark;
 

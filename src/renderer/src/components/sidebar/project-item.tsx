@@ -101,27 +101,22 @@ export function ProjectItem({
         onClick={handleHeaderClick}
         onDoubleClick={() => setEditing(true)}
         className={[
-          'group/proj relative flex items-center gap-1.5 pl-1.5 pr-1 py-1.5 rounded-lg cursor-pointer transition-colors',
+          'group/proj relative flex items-center gap-1 px-1 py-1 rounded-md cursor-pointer transition-colors',
           selected
-            ? 'bg-accent/12 text-foreground'
-            : 'text-foreground/75 hover:bg-foreground/5 hover:text-foreground',
+            ? 'text-foreground/90'
+            : 'text-foreground/45 hover:text-foreground/75',
         ].join(' ')}
         title={project.path}
       >
         <span
           className={[
-            'inline-flex items-center justify-center w-4 h-4 text-[10px] text-foreground/40 transition-transform',
+            'inline-flex items-center justify-center w-3.5 h-3.5 text-[9px] text-foreground/35 transition-transform',
             expanded ? 'rotate-90' : '',
           ].join(' ')}
           aria-hidden
         >
           ▶
         </span>
-        <span
-          className="inline-block w-2 h-2 rounded-full flex-shrink-0"
-          style={{ background: project.color }}
-          aria-hidden
-        />
         <div className="flex-1 min-w-0">
           {editing ? (
             <input
@@ -137,10 +132,10 @@ export function ProjectItem({
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full bg-transparent outline-none text-sm border-b border-foreground/30 focus:border-foreground"
+              className="w-full bg-transparent outline-none text-[13px] border-b border-foreground/30 focus:border-foreground"
             />
           ) : (
-            <div className="text-sm truncate">{project.name}</div>
+            <div className="text-[13px] font-medium truncate">{project.name}</div>
           )}
         </div>
 
@@ -150,12 +145,6 @@ export function ProjectItem({
             title="A terminal in this project wants your input"
             className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0 animate-pulse"
           />
-        )}
-
-        {project.terminals.length > 0 && (
-          <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-foreground/10 text-foreground/70">
-            {project.terminals.length}
-          </span>
         )}
 
         <button
@@ -207,7 +196,7 @@ export function ProjectItem({
       </div>
 
       {expanded && (
-        <div className="ml-3 mt-0.5 mb-1 pl-2 border-l border-accent/14 flex flex-col gap-0.5">
+        <div className="ml-3 mt-0.5 mb-1 pl-2 flex flex-col gap-0.5">
           {project.terminals.map((t) => (
             <TerminalSidebarItem
               key={t.id}

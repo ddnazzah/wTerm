@@ -6,13 +6,12 @@ import { TerminalPane } from './components/workspace/terminal-pane'
 import { EmptyState } from './components/workspace/empty-state'
 import { SettingsModal } from './components/settings-modal'
 import { UpdateBanner } from './components/update-banner'
-import { LeftActivityBar } from './components/left-activity-bar'
+import { TopBar } from './components/top-bar'
 import { StatusBar } from './components/status-bar'
 import { TerminalTabs } from './components/workspace/terminal-tabs'
 import { FileModal } from './components/workspace/file-modal'
 import { useProjects } from './hooks/use-projects'
 import { createProjectTerminal, useWorkspace } from './state/store'
-import { isWindows } from './lib/platform'
 import type { Project, TerminalRecord } from '@shared/types'
 
 export default function App() {
@@ -120,22 +119,28 @@ export default function App() {
   ])
 
   const handleBell = useCallback(
-    (project: Project, terminal: TerminalRecord) => {
+    (project: Project, terminal: TerminalRecord, kind: 'bell' | 'attention') => {
       const isVisible =
         project.id === selectedProject?.id && terminal.id === activeTerminalId
       const focused = document.hasFocus()
 
-      if (!(isVisible && focused)) {
-        bumpUnread(terminal.id)
-        pendingFocusRef.current = { projectId: project.id, terminalId: terminal.id }
-      }
+      // The user is already looking at this terminal — nothing to surface.
+      if (isVisible && focused) return
 
-      void window.api.system.notify({
-        title: project.name,
-        body: `${terminal.name} wants your input`,
-        projectId: project.id,
-        terminalId: terminal.id,
-      })
+      bumpUnread(terminal.id)
+      pendingFocusRef.current = { projectId: project.id, terminalId: terminal.id }
+
+      // Only a finished turn ("attention") warrants a desktop notification. A
+      // raw bell just marks the tab unread above, so a beep while you type
+      // doesn't pop "wants your input".
+      if (kind === 'attention') {
+        void window.api.system.notify({
+          title: project.name,
+          body: `${terminal.name} wants your input`,
+          projectId: project.id,
+          terminalId: terminal.id,
+        })
+      }
     },
     [selectedProject, activeTerminalId, bumpUnread]
   )
@@ -159,55 +164,50 @@ export default function App() {
   const selectedHasOpenFiles =
     !!selectedProject && openFiles.some((f) => f.projectId === selectedProject.id)
 
-  // When the right sidebar is hidden, the main header runs to the window's right
-  // edge — where the Windows window-controls overlay sits — so reserve room so
-  // tabs/content don't slide under the minimize/maximize/close buttons.
-  const rightSidebarVisible = !!selectedProject && !rightSidebarCollapsed
-  const titlebarRightGutter = isWindows && !rightSidebarVisible ? 'pr-[100px]' : ''
+  const sessionLabel = selectedProject
+    ? `${selectedProject.name}${activeTerminal ? ` — ${titleByTerminal[activeTerminal.id] || activeTerminal.name}` : ''}`
+    : 'wTerm'
 
   return (
     <div className="flex flex-col h-screen w-screen bg-surface text-foreground">
-      <div className="flex flex-1 min-h-0">
-        <LeftActivityBar onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar
+        label={sessionLabel}
+        onToggleSidebar={toggleSidebar}
+        onNewSession={() => {
+          if (selectedProject) void createProjectTerminal(selectedProject.id)
+        }}
+        newSessionDisabled={!selectedProject}
+      />
+      <div className="flex flex-1 min-h-0 gap-1.5 py-1.5">
         {!sidebarCollapsed && <ProjectList />}
         <main className="flex-1 flex flex-col min-w-0">
-          <header
-            className={`app-titlebar h-11 flex items-center px-4 border-b border-accent/14 ${titlebarRightGutter}`}
-          >
-            <span className="flex-1" />
-            <span className="text-[12px] text-foreground/70 truncate text-center">
-              {selectedProject
-                ? `${selectedProject.name}${activeTerminal ? ` — ${titleByTerminal[activeTerminal.id] || activeTerminal.name}` : ''} · wTerm`
-                : 'wTerm'}
-            </span>
-            <span className="flex-1" />
-          </header>
-
-          {selectedProject && selectedProject.terminals.length > 0 && (
-            <TerminalTabs project={selectedProject} />
-          )}
-
-          <div className="@container relative flex-1 min-w-0 overflow-hidden">
-            {allTerminals.map((t) => (
-              <TerminalPane
-                key={t.id}
-                terminalId={t.id}
-                active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
-                onBell={() => handleBell(t.project, t)}
-              />
-            ))}
-            {showEmptyNoProject && (
-              <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
+          <div className="flex flex-col h-full rounded-lg bg-background overflow-hidden">
+            {selectedProject && selectedProject.terminals.length > 0 && (
+              <TerminalTabs project={selectedProject} />
             )}
-            {showEmptyNoTerminals && (
-              <EmptyState
-                hasSelection
-                onCreateTerminal={() => {
-                  if (!selectedProject) return
-                  void createProjectTerminal(selectedProject.id)
-                }}
-              />
-            )}
+
+            <div className="@container relative flex-1 min-w-0 overflow-hidden">
+              {allTerminals.map((t) => (
+                <TerminalPane
+                  key={t.id}
+                  terminalId={t.id}
+                  active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
+                  onBell={(kind) => handleBell(t.project, t, kind)}
+                />
+              ))}
+              {showEmptyNoProject && (
+                <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
+              )}
+              {showEmptyNoTerminals && (
+                <EmptyState
+                  hasSelection
+                  onCreateTerminal={() => {
+                    if (!selectedProject) return
+                    void createProjectTerminal(selectedProject.id)
+                  }}
+                />
+              )}
+            </div>
           </div>
         </main>
         {selectedProject && !rightSidebarCollapsed && <RightSidebar project={selectedProject} />}

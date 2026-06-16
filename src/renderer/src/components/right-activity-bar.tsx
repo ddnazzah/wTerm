@@ -34,7 +34,7 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
     <aside
       className={`app-titlebar flex flex-col items-center justify-between gap-1 py-2 ${
         isWindows ? 'pt-12' : ''
-      } w-11 flex-shrink-0 border-l border-accent/14 bg-surface/40 backdrop-blur-sm`}
+      } w-11 flex-shrink-0 bg-surface`}
     >
       <div className="flex flex-col items-center gap-1">
         <ActivityButton

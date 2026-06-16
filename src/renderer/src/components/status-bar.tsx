@@ -35,7 +35,7 @@ export function StatusBar({ project }: Props) {
   const termCount = project?.terminals.length ?? 0
 
   return (
-    <footer className="flex items-center gap-3 h-6 px-3 text-[11px] text-foreground/60 border-t border-accent/14 bg-surface/60 flex-shrink-0 select-none">
+    <footer className="flex items-center gap-3 h-6 px-3 text-[11px] text-foreground/60 bg-surface flex-shrink-0 select-none">
       {branch && (
         <span className="flex items-center gap-1" title="Current branch">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

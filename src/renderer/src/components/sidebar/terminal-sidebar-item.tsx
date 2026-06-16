@@ -54,8 +54,14 @@ export function TerminalSidebarItem({
     >
       <span
         className={[
-          'terminal-item-indicator inline-block w-1 h-3 rounded-sm flex-shrink-0',
-          active ? 'bg-accent' : 'bg-foreground/25 group-hover/term:bg-foreground/40',
+          'terminal-item-indicator inline-block w-2 h-2 rounded-full flex-shrink-0',
+          busy
+            ? 'bg-accent'
+            : unread
+              ? 'bg-sky-400'
+              : active
+                ? 'bg-accent'
+                : 'bg-foreground/25 group-hover/term:bg-foreground/40',
         ].join(' ')}
         aria-hidden
       />
