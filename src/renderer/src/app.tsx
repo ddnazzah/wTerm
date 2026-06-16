@@ -8,7 +8,8 @@ import { SettingsModal } from './components/settings-modal'
 import { UpdateBanner } from './components/update-banner'
 import { TopBar } from './components/top-bar'
 import { StatusBar } from './components/status-bar'
-import { FileModal } from './components/workspace/file-modal'
+import { DockedEditor } from './components/workspace/docked-editor'
+import { EditorOverlay } from './components/workspace/editor-surface'
 import { BottomPanel } from './components/workspace/bottom-panel'
 import { useProjects } from './hooks/use-projects'
 import { createProjectTerminal, useWorkspace } from './state/store'
@@ -31,6 +32,8 @@ export default function App() {
   const bottomPanelOpen = useWorkspace((s) => s.bottomPanelOpen)
   const setBottomPanelOpen = useWorkspace((s) => s.setBottomPanelOpen)
   const openFiles = useWorkspace((s) => s.openFiles)
+  const editorViewMode = useWorkspace((s) => s.editorViewMode)
+  const closeFile = useWorkspace((s) => s.closeFile)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Toggle the Home terminal dock. Opening with no Home terminals starts one by
@@ -196,9 +199,39 @@ export default function App() {
   const selectedHasOpenFiles =
     !!selectedProject && openFiles.some((f) => f.projectId === selectedProject.id)
 
+  const closeAllFiles = useCallback(() => {
+    if (!selectedProject) return
+    for (const f of openFiles.filter((f) => f.projectId === selectedProject.id)) closeFile(f)
+  }, [openFiles, selectedProject, closeFile])
+
   const sessionLabel = selectedProject
     ? `${selectedProject.name}${activeTerminal ? ` — ${titleByTerminal[activeTerminal.id] || activeTerminal.name}` : ''}`
     : 'wTerm'
+
+  const terminalArea = (
+    <div className="@container relative flex-1 min-w-0 overflow-hidden">
+      {centerTerminals.map((t) => (
+        <TerminalPane
+          key={t.id}
+          terminalId={t.id}
+          active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
+          onBell={(kind) => handleBell(t.project, t, kind)}
+        />
+      ))}
+      {showEmptyNoProject && (
+        <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
+      )}
+      {showEmptyNoTerminals && (
+        <EmptyState
+          hasSelection
+          onCreateTerminal={() => {
+            if (!selectedProject) return
+            void createProjectTerminal(selectedProject.id)
+          }}
+        />
+      )}
+    </div>
+  )
 
   return (
     <div className="flex flex-col h-screen w-screen bg-surface text-foreground">
@@ -219,28 +252,13 @@ export default function App() {
           <div className="flex flex-1 min-h-0 gap-1.5">
             <main className="flex-1 flex flex-col min-w-0">
               <div className="flex flex-col h-full rounded-lg bg-background overflow-hidden">
-                <div className="@container relative flex-1 min-w-0 overflow-hidden">
-                  {centerTerminals.map((t) => (
-                    <TerminalPane
-                      key={t.id}
-                      terminalId={t.id}
-                      active={t.project.id === selectedProject?.id && t.id === activeTerminalId}
-                      onBell={(kind) => handleBell(t.project, t, kind)}
-                    />
-                  ))}
-                  {showEmptyNoProject && (
-                    <EmptyState hasSelection={false} onAddProject={() => void addProject()} />
-                  )}
-                  {showEmptyNoTerminals && (
-                    <EmptyState
-                      hasSelection
-                      onCreateTerminal={() => {
-                        if (!selectedProject) return
-                        void createProjectTerminal(selectedProject.id)
-                      }}
-                    />
-                  )}
-                </div>
+                {selectedProject && selectedHasOpenFiles && editorViewMode === 'docked' ? (
+                  <DockedEditor projectId={selectedProject.id} onClose={closeAllFiles}>
+                    {terminalArea}
+                  </DockedEditor>
+                ) : (
+                  terminalArea
+                )}
               </div>
             </main>
             {selectedProject && !rightSidebarCollapsed && <RightSidebar project={selectedProject} />}
@@ -253,7 +271,9 @@ export default function App() {
         />
       </div>
       <StatusBar project={selectedProject} />
-      {selectedProject && selectedHasOpenFiles && <FileModal projectId={selectedProject.id} />}
+      {selectedProject && selectedHasOpenFiles && editorViewMode !== 'docked' && (
+        <EditorOverlay projectId={selectedProject.id} />
+      )}
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <UpdateBanner />
     </div>
