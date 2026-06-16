@@ -8,6 +8,7 @@ import {
   type DeviceFlowStart,
   type FocusTerminalPayload,
   type FsEntry,
+  type GitFileStatusMap,
   type GitInfo,
   type GitHubSettings,
   type NotifyPayload,
@@ -127,6 +128,8 @@ const api = {
       ipcRenderer.invoke(IPC.git.info, projectId),
     push: (projectId: ProjectId, branch: string): Promise<{ ok: boolean; output: string }> =>
       ipcRenderer.invoke(IPC.git.push, projectId, branch),
+    fileStatus: (projectId: ProjectId): Promise<GitFileStatusMap> =>
+      ipcRenderer.invoke(IPC.git.fileStatus, projectId),
   },
   github: {
     getSettings: (): Promise<GitHubSettings> => ipcRenderer.invoke(IPC.github.getSettings),
