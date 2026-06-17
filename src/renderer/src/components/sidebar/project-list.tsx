@@ -13,6 +13,7 @@ export function ProjectList() {
     useProjects()
   const sidebarWidth = useWorkspace((s) => s.sidebarWidth)
   const setSidebarWidth = useWorkspace((s) => s.setSidebarWidth)
+  const reorderProjects = useWorkspace((s) => s.reorderProjects)
 
   // The Home workspace lives in the bottom terminal dock, not the project list.
   const userProjects = projects.filter((p) => !p.isDefault)
@@ -76,16 +77,18 @@ export function ProjectList() {
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {userProjects.map((p) => (
+            {userProjects.map((p, i) => (
               <ProjectItem
                 key={p.id}
                 project={p}
+                index={i}
                 selected={p.id === selectedProjectId}
                 onSelect={() => void select(p.id)}
                 onRename={(name) => void rename(p.id, name)}
                 onRemove={() => void remove(p.id)}
                 onOpenInITerm={() => void openInITerm(p.id)}
                 onOpenInFinder={() => void openInFinder(p.id)}
+                onReorderProject={(from, to) => reorderProjects(from, to)}
               />
             ))}
           </div>

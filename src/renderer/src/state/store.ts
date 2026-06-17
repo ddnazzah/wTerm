@@ -25,7 +25,7 @@ export type EditorViewMode = 'docked' | 'modal' | 'fullscreen'
 
 const readEditorViewMode = (): EditorViewMode => {
   const raw = localStorage.getItem(EDITOR_VIEW_MODE_KEY)
-  return raw === 'modal' || raw === 'fullscreen' || raw === 'docked' ? raw : 'docked'
+  return raw === 'modal' || raw === 'fullscreen' || raw === 'docked' ? raw : 'modal'
 }
 
 const readDockSplitRatio = (): number => {
@@ -206,11 +206,13 @@ interface WorkspaceState {
   removeProject: (id: ProjectId) => void
   selectProject: (id: ProjectId | null) => void
   renameProject: (id: ProjectId, name: string) => void
+  reorderProjects: (fromIndex: number, toIndex: number) => void
 
   addTerminal: (projectId: ProjectId, terminal: TerminalRecord) => void
   removeTerminalLocal: (projectId: ProjectId, terminalId: TerminalId) => void
   renameTerminalLocal: (projectId: ProjectId, terminalId: TerminalId, name: string) => void
   setActiveTerminal: (projectId: ProjectId, terminalId: TerminalId | null) => void
+  reorderTerminal: (projectId: ProjectId, fromIndex: number, toIndex: number) => void
 
   toggleProjectExpanded: (id: ProjectId) => void
   setProjectExpanded: (id: ProjectId, expanded: boolean) => void
@@ -530,6 +532,29 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)),
     })),
 
+  // Reorder user projects by their position in the sidebar (default/Home
+  // projects are pinned to the front and excluded from the indices). Persists
+  // the new order to the main process.
+  reorderProjects: (fromIndex, toIndex) =>
+    set((state) => {
+      const defaults = state.projects.filter((p) => p.isDefault)
+      const users = state.projects.filter((p) => !p.isDefault)
+      if (
+        fromIndex < 0 ||
+        fromIndex >= users.length ||
+        toIndex < 0 ||
+        toIndex >= users.length ||
+        fromIndex === toIndex
+      ) {
+        return {}
+      }
+      const next = [...users]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      window.api?.projects.reorder(next.map((p) => p.id))
+      return { projects: [...defaults, ...next] }
+    }),
+
   addTerminal: (projectId, terminal) => {
     set((state) => ({
       projects: state.projects.map((p) =>
@@ -585,6 +610,28 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         titleByTerminal: titleRest,
       }
     }),
+
+  // Reorder terminals within a single project. Session-only — terminals are
+  // never persisted, so this just reorders the in-memory array.
+  reorderTerminal: (projectId, fromIndex, toIndex) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p
+        if (
+          fromIndex < 0 ||
+          fromIndex >= p.terminals.length ||
+          toIndex < 0 ||
+          toIndex >= p.terminals.length ||
+          fromIndex === toIndex
+        ) {
+          return p
+        }
+        const next = [...p.terminals]
+        const [moved] = next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, moved)
+        return { ...p, terminals: next }
+      }),
+    })),
 
   setActiveTerminal: (projectId, terminalId) => {
     set((state) => ({
@@ -661,4 +708,15 @@ export async function createProjectTerminal(
   const record = await window.api.terminals.create({ projectId, startupCommand, ...opts })
   if (record) useWorkspace.getState().addTerminal(projectId, record)
   return record
+}
+
+// Dev-only: editing this module hot-swaps it, which makes `create()` build a new
+// store instance while already-mounted components stay bound to the old one —
+// so actions update one store and the UI reads another ("clicks do nothing").
+// Force a full reload on store edits so there is only ever one live instance.
+// `import.meta.hot` is undefined in production builds, so this strips out.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    window.location.reload()
+  })
 }

@@ -4,7 +4,7 @@
    than --background so the editor area visually "lifts" out of the frame,
    matching how VS Code / typical IDEs layer their chrome. */
 [data-theme='halcyon'] {
-  --background: #1d2433;
+  --background: #171c28;
 }
 
 @layer base {
@@ -17,7 +17,7 @@
 
     --foreground: #a2aabc;
 
-    --surface: #171c28;
+    --surface: #1d2433;
     --surface-foreground: var(--foreground);
     --surface-secondary: #1d2433;
     --surface-tertiary: #2f3b54;

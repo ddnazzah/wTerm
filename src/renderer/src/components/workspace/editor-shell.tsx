@@ -9,17 +9,27 @@ interface Props {
 }
 
 export function EditorShell({ projectId, onClose }: Props) {
-  const activeFileByProject = useWorkspace((s) => s.activeFileByProject)
-  const activePath = activeFileByProject[projectId] ?? null
-  const filename = activePath ? activePath.split('/').pop() ?? activePath : 'Untitled'
+  const viewMode = useWorkspace((s) => s.editorViewMode)
   return (
     <div
       data-editor-surface
       className="flex flex-col h-full w-full min-h-0 bg-surface overflow-hidden"
     >
-      <EditorChrome filename={filename} onClose={onClose} />
-      <div className="h-9 border-b border-accent/14 flex-shrink-0">
-        <FileTabs projectId={projectId} />
+      {/* One unified toolbar: tabs (with the filename) on the left, view-mode
+          switch + close on the right. No separate title row, so the filename
+          is never shown twice. */}
+      <div
+        className={[
+          'flex items-stretch h-9 border-b border-accent/14 bg-surface/80 flex-shrink-0',
+          // In fullscreen the toolbar sits at the window's top edge — leave room
+          // for the macOS traffic lights at top-left.
+          viewMode === 'fullscreen' ? 'pl-[76px]' : '',
+        ].join(' ')}
+      >
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <FileTabs projectId={projectId} />
+        </div>
+        <EditorChrome onClose={onClose} />
       </div>
       <div className="flex-1 min-h-0">
         <FileViewer projectId={projectId} />

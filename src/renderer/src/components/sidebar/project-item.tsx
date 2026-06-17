@@ -13,11 +13,13 @@ const FILE_MANAGER_APP = isMac ? 'Finder' : isWindows ? 'Explorer' : 'file manag
 interface Props {
   project: Project
   selected: boolean
+  index: number
   onSelect: () => void
   onRename: (name: string) => void
   onRemove: () => void
   onOpenInITerm: () => void
   onOpenInFinder: () => void
+  onReorderProject: (from: number, to: number) => void
 }
 
 const ACTIONS = {
@@ -33,11 +35,13 @@ type ActionKey = (typeof ACTIONS)[keyof typeof ACTIONS]
 export function ProjectItem({
   project,
   selected,
+  index,
   onSelect,
   onRename,
   onRemove,
   onOpenInITerm,
   onOpenInFinder,
+  onReorderProject,
 }: Props) {
   const expanded = useWorkspace((s) => !!s.expandedProjectIds[project.id])
   const toggleExpanded = useWorkspace((s) => s.toggleProjectExpanded)
@@ -45,6 +49,8 @@ export function ProjectItem({
   const unreadByTerminal = useWorkspace((s) => s.unreadByTerminal)
   const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
   const busyByTerminal = useWorkspace((s) => s.busyByTerminal)
+  const reorderTerminal = useWorkspace((s) => s.reorderTerminal)
+  const [projDragOver, setProjDragOver] = useState(false)
 
   const { activeId, create, close, rename: renameTerminal, setActive } = useTerminals(project)
 
@@ -98,13 +104,38 @@ export function ProjectItem({
   return (
     <div className="flex flex-col">
       <div
+        draggable={!editing}
         onClick={handleHeaderClick}
         onDoubleClick={() => setEditing(true)}
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'project', index }))
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('text/plain')) return
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'move'
+          setProjDragOver(true)
+        }}
+        onDragLeave={() => setProjDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setProjDragOver(false)
+          try {
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+            if (data?.kind === 'project' && typeof data.index === 'number') {
+              onReorderProject(data.index, index)
+            }
+          } catch {
+            // ignore malformed payloads
+          }
+        }}
         className={[
           'group/proj relative flex items-center gap-1 px-1 py-1 rounded-md cursor-pointer transition-colors',
           selected
             ? 'text-foreground/90'
             : 'text-foreground/45 hover:text-foreground/75',
+          projDragOver ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : '',
         ].join(' ')}
         title={project.path}
       >
@@ -197,10 +228,12 @@ export function ProjectItem({
 
       {expanded && (
         <div className="ml-3 mt-0.5 mb-1 pl-2 flex flex-col gap-0.5">
-          {project.terminals.map((t) => (
+          {project.terminals.map((t, i) => (
             <TerminalSidebarItem
               key={t.id}
               terminal={t}
+              index={i}
+              projectId={project.id}
               active={selected && t.id === activeId}
               unread={(unreadByTerminal[t.id] ?? 0) > 0}
               busy={!!busyByTerminal[t.id]}
@@ -211,6 +244,7 @@ export function ProjectItem({
               }}
               onClose={() => void close(t.id)}
               onRename={(name) => void renameTerminal(t.id, name)}
+              onReorder={(from, to) => reorderTerminal(project.id, from, to)}
             />
           ))}
           <button

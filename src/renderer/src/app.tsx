@@ -12,7 +12,7 @@ import { DockedEditor } from './components/workspace/docked-editor'
 import { EditorOverlay } from './components/workspace/editor-surface'
 import { BottomPanel } from './components/workspace/bottom-panel'
 import { useProjects } from './hooks/use-projects'
-import { createProjectTerminal, useWorkspace } from './state/store'
+import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { HOME_PROJECT_ID, type Project, type TerminalRecord } from '@shared/types'
 
 export default function App() {

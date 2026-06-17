@@ -35,6 +35,8 @@ const api = {
       ipcRenderer.invoke(IPC.projects.remove, id),
     rename: (id: ProjectId, name: string): Promise<void> =>
       ipcRenderer.invoke(IPC.projects.rename, id, name),
+    reorder: (orderedIds: ProjectId[]): Promise<void> =>
+      ipcRenderer.invoke(IPC.projects.reorder, orderedIds),
     select: (id: ProjectId | null): Promise<void> =>
       ipcRenderer.invoke(IPC.projects.select, id),
     openInITerm: (id: ProjectId): Promise<void> =>

@@ -7,9 +7,12 @@ interface Props {
   unread: boolean
   busy?: boolean
   autoTitle?: string
+  index: number
+  projectId: string
   onSelect: () => void
   onClose: () => void
   onRename: (name: string) => void
+  onReorder: (from: number, to: number) => void
 }
 
 export function TerminalSidebarItem({
@@ -18,12 +21,16 @@ export function TerminalSidebarItem({
   unread,
   busy,
   autoTitle,
+  index,
+  projectId,
   onSelect,
   onClose,
   onRename,
+  onReorder,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(terminal.name)
+  const [dragOver, setDragOver] = useState(false)
 
   useEffect(() => setDraft(terminal.name), [terminal.name])
 
@@ -38,10 +45,36 @@ export function TerminalSidebarItem({
 
   return (
     <div
+      draggable={!editing}
       onClick={onSelect}
       onDoubleClick={(e) => {
         e.stopPropagation()
         setEditing(true)
+      }}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ kind: 'term', projectId, index }))
+        e.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('text/plain')) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'move'
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDragOver(false)
+        try {
+          const data = JSON.parse(e.dataTransfer.getData('text/plain'))
+          if (data?.kind === 'term' && data.projectId === projectId && typeof data.index === 'number') {
+            onReorder(data.index, index)
+          }
+        } catch {
+          // ignore malformed payloads
+        }
       }}
       className={[
         'group/term relative flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-md cursor-pointer transition-colors text-xs',
@@ -49,6 +82,7 @@ export function TerminalSidebarItem({
           ? 'bg-accent/12 text-foreground'
           : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
         busy ? 'terminal-item-busy' : '',
+        dragOver ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : '',
       ].join(' ')}
       title={displayName}
     >

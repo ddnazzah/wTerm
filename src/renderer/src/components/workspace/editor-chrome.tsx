@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { useWorkspace, type EditorViewMode } from '@renderer/state/store'
 
 interface Props {
-  filename: string
   onClose: () => void
 }
 
@@ -32,12 +31,11 @@ const MODES: { mode: EditorViewMode; title: string; icon: ReactNode }[] = [
   },
 ]
 
-export function EditorChrome({ filename, onClose }: Props) {
+export function EditorChrome({ onClose }: Props) {
   const viewMode = useWorkspace((s) => s.editorViewMode)
   const setViewMode = useWorkspace((s) => s.setEditorViewMode)
   return (
-    <div className="flex items-center gap-2 h-9 px-3 border-b border-accent/14 bg-surface/80 flex-shrink-0">
-      <span className="text-[12px] text-foreground/85 font-medium truncate flex-1">{filename}</span>
+    <div className="flex items-center gap-1 px-2 flex-shrink-0">
       <div className="flex items-center gap-0.5 rounded-md bg-foreground/5 p-0.5">
         {MODES.map(({ mode, title, icon }) => (
           <button
