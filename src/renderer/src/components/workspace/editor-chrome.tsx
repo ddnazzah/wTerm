@@ -6,35 +6,26 @@ interface Props {
   onClose: () => void
 }
 
-const MODES: { mode: EditorViewMode; label: string; title: string; icon: ReactNode }[] = [
+const MODES: { mode: EditorViewMode; title: string; icon: ReactNode }[] = [
   {
     mode: 'docked',
-    label: 'Dock',
     title: 'Dock — split above the terminal',
-    // Panel split: frame with a filled bottom band.
+    // Panel split: frame with a divider near the bottom.
     icon: (
       <>
         <rect x="3" y="4" width="18" height="16" rx="1.5" />
         <path d="M3 14h18" />
-        <path d="M3 17h18" strokeWidth="3" opacity="0.5" />
       </>
     ),
   },
   {
     mode: 'modal',
-    label: 'Float',
     title: 'Floating window',
-    // Floating window: smaller frame with a title bar.
-    icon: (
-      <>
-        <rect x="5" y="6" width="14" height="12" rx="1.5" />
-        <path d="M5 9.5h14" />
-      </>
-    ),
+    // Floating window: a small centered frame.
+    icon: <rect x="6" y="7" width="12" height="10" rx="1.5" />,
   },
   {
     mode: 'fullscreen',
-    label: 'Full',
     title: 'Fullscreen',
     // Maximize: four outward corners.
     icon: <path d="M8 4H4v4 M16 4h4v4 M8 20H4v-4 M16 20h4v-4" />,
@@ -48,7 +39,7 @@ export function EditorChrome({ filename, onClose }: Props) {
     <div className="flex items-center gap-2 h-9 px-3 border-b border-accent/14 bg-surface/80 flex-shrink-0">
       <span className="text-[12px] text-foreground/85 font-medium truncate flex-1">{filename}</span>
       <div className="flex items-center gap-0.5 rounded-md bg-foreground/5 p-0.5">
-        {MODES.map(({ mode, label, title, icon }) => (
+        {MODES.map(({ mode, title, icon }) => (
           <button
             key={mode}
             type="button"
@@ -56,16 +47,15 @@ export function EditorChrome({ filename, onClose }: Props) {
             aria-pressed={viewMode === mode}
             onClick={() => setViewMode(mode)}
             className={[
-              'flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium transition-colors',
+              'flex items-center justify-center w-6 h-6 rounded transition-colors',
               viewMode === mode
                 ? 'bg-accent text-accent-foreground'
-                : 'text-foreground/60 hover:text-foreground hover:bg-foreground/10',
+                : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
             ].join(' ')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               {icon}
             </svg>
-            {label}
           </button>
         ))}
       </div>
