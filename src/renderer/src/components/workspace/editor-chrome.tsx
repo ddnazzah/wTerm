@@ -6,21 +6,38 @@ interface Props {
   onClose: () => void
 }
 
-const MODES: { mode: EditorViewMode; title: string; icon: ReactNode }[] = [
+const MODES: { mode: EditorViewMode; label: string; title: string; icon: ReactNode }[] = [
   {
     mode: 'docked',
-    title: 'Dock (split with terminal)',
-    icon: <path d="M3 4h18v16H3z M3 13h18" />,
+    label: 'Dock',
+    title: 'Dock — split above the terminal',
+    // Panel split: frame with a filled bottom band.
+    icon: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="1.5" />
+        <path d="M3 14h18" />
+        <path d="M3 17h18" strokeWidth="3" opacity="0.5" />
+      </>
+    ),
   },
   {
     mode: 'modal',
+    label: 'Float',
     title: 'Floating window',
-    icon: <path d="M5 6h14v12H5z" />,
+    // Floating window: smaller frame with a title bar.
+    icon: (
+      <>
+        <rect x="5" y="6" width="14" height="12" rx="1.5" />
+        <path d="M5 9.5h14" />
+      </>
+    ),
   },
   {
     mode: 'fullscreen',
+    label: 'Full',
     title: 'Fullscreen',
-    icon: <path d="M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5" />,
+    // Maximize: four outward corners.
+    icon: <path d="M8 4H4v4 M16 4h4v4 M8 20H4v-4 M16 20h4v-4" />,
   },
 ]
 
@@ -30,25 +47,28 @@ export function EditorChrome({ filename, onClose }: Props) {
   return (
     <div className="flex items-center gap-2 h-9 px-3 border-b border-accent/14 bg-surface/80 flex-shrink-0">
       <span className="text-[12px] text-foreground/85 font-medium truncate flex-1">{filename}</span>
-      {MODES.map(({ mode, title, icon }) => (
-        <button
-          key={mode}
-          type="button"
-          title={title}
-          aria-pressed={viewMode === mode}
-          onClick={() => setViewMode(mode)}
-          className={[
-            'flex items-center justify-center w-6 h-6 rounded-md transition-colors',
-            viewMode === mode
-              ? 'bg-foreground/10 text-foreground'
-              : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
-          ].join(' ')}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            {icon}
-          </svg>
-        </button>
-      ))}
+      <div className="flex items-center gap-0.5 rounded-md bg-foreground/5 p-0.5">
+        {MODES.map(({ mode, label, title, icon }) => (
+          <button
+            key={mode}
+            type="button"
+            title={title}
+            aria-pressed={viewMode === mode}
+            onClick={() => setViewMode(mode)}
+            className={[
+              'flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium transition-colors',
+              viewMode === mode
+                ? 'bg-accent text-accent-foreground'
+                : 'text-foreground/60 hover:text-foreground hover:bg-foreground/10',
+            ].join(' ')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {icon}
+            </svg>
+            {label}
+          </button>
+        ))}
+      </div>
       <button
         type="button"
         onClick={onClose}
