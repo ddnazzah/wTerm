@@ -7,6 +7,7 @@ export interface EditorSettings {
   insertSpaces: boolean
   wordWrap: boolean
   lineNumbers: boolean
+  minimap: boolean
   /** Run prettier on save when supported. */
   formatOnSave: boolean
 }
@@ -18,6 +19,7 @@ export const DEFAULTS: EditorSettings = {
   insertSpaces: true,
   wordWrap: false,
   lineNumbers: true,
+  minimap: true,
   formatOnSave: false,
 }
 

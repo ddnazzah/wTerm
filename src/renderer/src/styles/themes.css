@@ -4,19 +4,20 @@
    than --background so the editor area visually "lifts" out of the frame,
    matching how VS Code / typical IDEs layer their chrome. */
 [data-theme='halcyon'] {
-  --background: #1d2433;
+  --background: #171c28;
 }
 
 @layer base {
-  /* Halcyon — port of bchiang7/halcyon-vscode.
+  /* Halcyon — port of bchiang7/halcyon-vscode (Brittany Chiang).
      Deep navy chrome (#171c28), slightly lighter editor surface (#1d2433),
-     muted blue-gray foreground (#a2aabc), yellow accent (#ffcc66). */
+     muted blue-gray foreground (#a2aabc), yellow accent (#ffcc66).
+     Palette verified against the upstream repo's documented color table. */
   [data-theme='halcyon'] {
     color-scheme: dark;
 
     --foreground: #a2aabc;
 
-    --surface: #171c28;
+    --surface: #1d2433;
     --surface-foreground: var(--foreground);
     --surface-secondary: #1d2433;
     --surface-tertiary: #2f3b54;
@@ -37,6 +38,11 @@
 
     --accent: #ffcc66;
     --accent-foreground: #171c28;
+
+    --git-modified: #d7a85f;
+    --git-added: #5fb87a;
+    --git-deleted: #d16969;
+    --git-conflict: #d98e4f;
 
     --success: #bae67e;
     --success-foreground: #171c28;

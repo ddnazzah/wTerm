@@ -10,16 +10,41 @@ export const RIGHT_SIDEBAR_MIN_WIDTH = 260
 export const RIGHT_SIDEBAR_MAX_WIDTH = 640
 export const RIGHT_SIDEBAR_DEFAULT_WIDTH = 340
 
-export const FILE_PANE_MIN_WIDTH = 320
-export const FILE_PANE_MAX_WIDTH = 1200
-export const FILE_PANE_DEFAULT_WIDTH = 560
-
 const SIDEBAR_WIDTH_KEY = 'tw:sidebar-width'
 const SIDEBAR_COLLAPSED_KEY = 'tw:sidebar-collapsed'
 const RIGHT_SIDEBAR_WIDTH_KEY = 'tw:right-sidebar-width'
 const RIGHT_SIDEBAR_COLLAPSED_KEY = 'tw:right-sidebar-collapsed'
+const BOTTOM_PANEL_OPEN_KEY = 'tw:bottom-panel-open'
+const BOTTOM_PANEL_HEIGHT_KEY = 'tw:bottom-panel-height'
 const RIGHT_SIDEBAR_TAB_KEY = 'tw:right-sidebar-tab'
-const FILE_PANE_WIDTH_KEY = 'tw:file-pane-width'
+const FILE_MODAL_SIZE_KEY = 'tw:file-modal-size'
+const EDITOR_VIEW_MODE_KEY = 'tw:editor-view-mode'
+const DOCK_SPLIT_KEY = 'tw:dock-split-ratio'
+
+export type EditorViewMode = 'docked' | 'modal' | 'fullscreen'
+
+const readEditorViewMode = (): EditorViewMode => {
+  const raw = localStorage.getItem(EDITOR_VIEW_MODE_KEY)
+  return raw === 'modal' || raw === 'fullscreen' || raw === 'docked' ? raw : 'modal'
+}
+
+const readDockSplitRatio = (): number => {
+  const n = Number.parseFloat(localStorage.getItem(DOCK_SPLIT_KEY) ?? '')
+  return Number.isFinite(n) && n > 0.15 && n < 0.85 ? n : 0.6
+}
+
+const readInitialFileModalSize = (): { width: number; height: number } => {
+  try {
+    const raw = localStorage.getItem(FILE_MODAL_SIZE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as { width: number; height: number }
+      if (parsed?.width && parsed?.height) return parsed
+    }
+  } catch {
+    // ignore
+  }
+  return { width: 900, height: 600 }
+}
 
 export type RightSidebarTab = 'files' | 'git'
 
@@ -42,9 +67,6 @@ const clampSidebarWidth = (w: number): number =>
 
 const clampRightSidebarWidth = (w: number): number =>
   Math.min(RIGHT_SIDEBAR_MAX_WIDTH, Math.max(RIGHT_SIDEBAR_MIN_WIDTH, Math.round(w)))
-
-const clampFilePaneWidth = (w: number): number =>
-  Math.min(FILE_PANE_MAX_WIDTH, Math.max(FILE_PANE_MIN_WIDTH, Math.round(w)))
 
 const readInitialSidebarWidth = (): number => {
   try {
@@ -83,22 +105,38 @@ const readInitialRightSidebarCollapsed = (): boolean => {
   }
 }
 
+export const BOTTOM_PANEL_MIN_HEIGHT = 120
+export const BOTTOM_PANEL_MAX_HEIGHT = 800
+const BOTTOM_PANEL_DEFAULT_HEIGHT = 260
+
+const clampBottomPanelHeight = (h: number): number =>
+  Math.min(BOTTOM_PANEL_MAX_HEIGHT, Math.max(BOTTOM_PANEL_MIN_HEIGHT, Math.round(h)))
+
+const readInitialBottomPanelHeight = (): number => {
+  try {
+    const raw = localStorage.getItem(BOTTOM_PANEL_HEIGHT_KEY)
+    const n = raw ? Number.parseInt(raw, 10) : NaN
+    return Number.isFinite(n) ? clampBottomPanelHeight(n) : BOTTOM_PANEL_DEFAULT_HEIGHT
+  } catch {
+    return BOTTOM_PANEL_DEFAULT_HEIGHT
+  }
+}
+
+const readInitialBottomPanelOpen = (): boolean => {
+  try {
+    // default to CLOSED; explicit '1' means open
+    return localStorage.getItem(BOTTOM_PANEL_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 const readInitialRightSidebarTab = (): RightSidebarTab => {
   try {
     const raw = localStorage.getItem(RIGHT_SIDEBAR_TAB_KEY)
     return raw === 'git' ? 'git' : 'files'
   } catch {
     return 'files'
-  }
-}
-
-const readInitialFilePaneWidth = (): number => {
-  try {
-    const raw = localStorage.getItem(FILE_PANE_WIDTH_KEY)
-    const n = raw ? Number.parseInt(raw, 10) : NaN
-    return Number.isFinite(n) ? clampFilePaneWidth(n) : FILE_PANE_DEFAULT_WIDTH
-  } catch {
-    return FILE_PANE_DEFAULT_WIDTH
   }
 }
 
@@ -123,16 +161,32 @@ interface WorkspaceState {
   setRightSidebarWidth: (width: number) => void
   setRightSidebarCollapsed: (collapsed: boolean) => void
   toggleRightSidebar: () => void
-  setRightSidebarTab: (tab: RightSidebarTab) => void
 
-  filePaneWidth: number
-  setFilePaneWidth: (width: number) => void
+  bottomPanelOpen: boolean
+  bottomPanelHeight: number
+  toggleBottomPanel: () => void
+  setBottomPanelOpen: (open: boolean) => void
+  setBottomPanelHeight: (height: number) => void
+  setRightSidebarTab: (tab: RightSidebarTab) => void
 
   openFiles: OpenedFile[]
   /** Per-project active file path (null = no file open in that project). */
   activeFileByProject: Record<string, string | null>
   /** Load + edit state per tab. */
   fileStates: Record<FileTabKey, FileLoadState>
+
+  fileModalOpen: boolean
+  fileModalWidth: number
+  fileModalHeight: number
+  openFileModal: () => void
+  closeFileModal: () => void
+  setFileModalSize: (width: number, height: number) => void
+
+  editorViewMode: EditorViewMode
+  setEditorViewMode: (m: EditorViewMode) => void
+  dockSplitRatio: number
+  setDockSplitRatio: (r: number) => void
+  reorderFile: (projectId: string, from: number, to: number) => void
 
   openFile: (file: OpenedFile) => void
   closeFile: (file: OpenedFile) => void
@@ -152,11 +206,13 @@ interface WorkspaceState {
   removeProject: (id: ProjectId) => void
   selectProject: (id: ProjectId | null) => void
   renameProject: (id: ProjectId, name: string) => void
+  reorderProjects: (fromIndex: number, toIndex: number) => void
 
   addTerminal: (projectId: ProjectId, terminal: TerminalRecord) => void
   removeTerminalLocal: (projectId: ProjectId, terminalId: TerminalId) => void
   renameTerminalLocal: (projectId: ProjectId, terminalId: TerminalId, name: string) => void
   setActiveTerminal: (projectId: ProjectId, terminalId: TerminalId | null) => void
+  reorderTerminal: (projectId: ProjectId, fromIndex: number, toIndex: number) => void
 
   toggleProjectExpanded: (id: ProjectId) => void
   setProjectExpanded: (id: ProjectId, expanded: boolean) => void
@@ -185,17 +241,8 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   rightSidebarCollapsed: readInitialRightSidebarCollapsed(),
   rightSidebarTab: readInitialRightSidebarTab(),
 
-  filePaneWidth: readInitialFilePaneWidth(),
-
-  setFilePaneWidth: (width) => {
-    const next = clampFilePaneWidth(width)
-    set({ filePaneWidth: next })
-    try {
-      localStorage.setItem(FILE_PANE_WIDTH_KEY, String(next))
-    } catch {
-      // ignore
-    }
-  },
+  bottomPanelOpen: readInitialBottomPanelOpen(),
+  bottomPanelHeight: readInitialBottomPanelHeight(),
 
   setRightSidebarWidth: (width) => {
     const next = clampRightSidebarWidth(width)
@@ -236,6 +283,74 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
     }
   },
 
+  setBottomPanelOpen: (open) => {
+    set({ bottomPanelOpen: open })
+    try {
+      localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, open ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  },
+
+  toggleBottomPanel: () =>
+    set((state) => {
+      const next = !state.bottomPanelOpen
+      try {
+        localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, next ? '1' : '0')
+      } catch {
+        // ignore
+      }
+      return { bottomPanelOpen: next }
+    }),
+
+  setBottomPanelHeight: (height) => {
+    const next = clampBottomPanelHeight(height)
+    set({ bottomPanelHeight: next })
+    try {
+      localStorage.setItem(BOTTOM_PANEL_HEIGHT_KEY, String(next))
+    } catch {
+      // ignore
+    }
+  },
+
+  fileModalOpen: false,
+  fileModalWidth: readInitialFileModalSize().width,
+  fileModalHeight: readInitialFileModalSize().height,
+  openFileModal: () => set({ fileModalOpen: true }),
+  closeFileModal: () => set({ fileModalOpen: false }),
+  setFileModalSize: (width, height) => {
+    const w = Math.max(420, Math.min(width, window.innerWidth - 80))
+    const h = Math.max(300, Math.min(height, window.innerHeight - 80))
+    set({ fileModalWidth: w, fileModalHeight: h })
+    try {
+      localStorage.setItem(FILE_MODAL_SIZE_KEY, JSON.stringify({ width: w, height: h }))
+    } catch {
+      // ignore
+    }
+  },
+
+  editorViewMode: readEditorViewMode(),
+  setEditorViewMode: (m) => {
+    localStorage.setItem(EDITOR_VIEW_MODE_KEY, m)
+    set({ editorViewMode: m })
+  },
+  dockSplitRatio: readDockSplitRatio(),
+  setDockSplitRatio: (r) => {
+    const clamped = Math.min(0.85, Math.max(0.15, r))
+    localStorage.setItem(DOCK_SPLIT_KEY, String(clamped))
+    set({ dockSplitRatio: clamped })
+  },
+  reorderFile: (projectId, from, to) =>
+    set((state) => {
+      const proj = state.openFiles.filter((f) => f.projectId === projectId)
+      const others = state.openFiles.filter((f) => f.projectId !== projectId)
+      if (from < 0 || to < 0 || from >= proj.length || to >= proj.length) return {}
+      const next = [...proj]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return { openFiles: [...others, ...next] }
+    }),
+
   openFiles: [],
   activeFileByProject: {},
   fileStates: {},
@@ -252,6 +367,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         fileStates: alreadyOpen
           ? state.fileStates
           : { ...state.fileStates, [key]: { kind: 'loading' } },
+        fileModalOpen: true,
       }
     }),
 
@@ -268,10 +384,12 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
             .at(-1)?.path ?? null
         : state.activeFileByProject[file.projectId] ?? null
       const { [key]: _omit, ...rest } = state.fileStates
+      const remainingForProject = remaining.filter((f) => f.projectId === file.projectId)
       return {
         openFiles: remaining,
         activeFileByProject: { ...state.activeFileByProject, [file.projectId]: nextActive },
         fileStates: rest,
+        fileModalOpen: remainingForProject.length === 0 ? false : state.fileModalOpen,
       }
     }),
 
@@ -404,12 +522,38 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       expandedProjectIds: id
         ? { ...state.expandedProjectIds, [id]: true }
         : state.expandedProjectIds,
+      // The file modal is a per-open-action overlay; switching projects dismisses
+      // it so it only ever reappears when the user opens a file.
+      fileModalOpen: false,
     })),
 
   renameProject: (id, name) =>
     set((state) => ({
       projects: state.projects.map((p) => (p.id === id ? { ...p, name } : p)),
     })),
+
+  // Reorder user projects by their position in the sidebar (default/Home
+  // projects are pinned to the front and excluded from the indices). Persists
+  // the new order to the main process.
+  reorderProjects: (fromIndex, toIndex) =>
+    set((state) => {
+      const defaults = state.projects.filter((p) => p.isDefault)
+      const users = state.projects.filter((p) => !p.isDefault)
+      if (
+        fromIndex < 0 ||
+        fromIndex >= users.length ||
+        toIndex < 0 ||
+        toIndex >= users.length ||
+        fromIndex === toIndex
+      ) {
+        return {}
+      }
+      const next = [...users]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      window.api?.projects.reorder(next.map((p) => p.id))
+      return { projects: [...defaults, ...next] }
+    }),
 
   addTerminal: (projectId, terminal) => {
     set((state) => ({
@@ -466,6 +610,28 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         titleByTerminal: titleRest,
       }
     }),
+
+  // Reorder terminals within a single project. Session-only — terminals are
+  // never persisted, so this just reorders the in-memory array.
+  reorderTerminal: (projectId, fromIndex, toIndex) =>
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== projectId) return p
+        if (
+          fromIndex < 0 ||
+          fromIndex >= p.terminals.length ||
+          toIndex < 0 ||
+          toIndex >= p.terminals.length ||
+          fromIndex === toIndex
+        ) {
+          return p
+        }
+        const next = [...p.terminals]
+        const [moved] = next.splice(fromIndex, 1)
+        next.splice(toIndex, 0, moved)
+        return { ...p, terminals: next }
+      }),
+    })),
 
   setActiveTerminal: (projectId, terminalId) => {
     set((state) => ({
@@ -542,4 +708,15 @@ export async function createProjectTerminal(
   const record = await window.api.terminals.create({ projectId, startupCommand, ...opts })
   if (record) useWorkspace.getState().addTerminal(projectId, record)
   return record
+}
+
+// Dev-only: editing this module hot-swaps it, which makes `create()` build a new
+// store instance while already-mounted components stay bound to the old one —
+// so actions update one store and the UI reads another ("clicks do nothing").
+// Force a full reload on store edits so there is only ever one live instance.
+// `import.meta.hot` is undefined in production builds, so this strips out.
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    window.location.reload()
+  })
 }

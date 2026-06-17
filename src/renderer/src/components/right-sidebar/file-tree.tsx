@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { FsEntry, Project } from '@shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FsEntry, GitFileStatus, GitFileStatusMap, Project } from '@shared/types'
 import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { FileIcon } from './file-icon'
 
@@ -16,6 +16,7 @@ export function FileTree({ project }: Props) {
   )
 
   const [rootEntries, setRootEntries] = useState<FsEntry[]>([])
+  const [gitStatus, setGitStatus] = useState<GitFileStatusMap>({})
   const [children, setChildren] = useState<ChildrenMap>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -25,6 +26,13 @@ export function FileTree({ project }: Props) {
     kind: 'file' | 'folder'
   } | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
+  const typeAhead = useRef<{ buffer: string; at: number }>({ buffer: '', at: 0 })
+
+  const visibleRows = useMemo(
+    () => flattenVisible(rootEntries, children, expanded),
+    [rootEntries, children, expanded]
+  )
 
   const reloadRoot = useCallback(async () => {
     setLoading(true)
@@ -33,16 +41,22 @@ export function FileTree({ project }: Props) {
     setLoading(false)
   }, [project.id])
 
+  const reloadGit = useCallback(async () => {
+    setGitStatus(await window.api.git.fileStatus(project.id))
+  }, [project.id])
+
   const reloadFolder = useCallback(
     async (relPath: string) => {
       if (relPath === '') {
         await reloadRoot()
+        void reloadGit()
         return
       }
       const list = await window.api.fs.list(project.id, relPath)
       setChildren((c) => ({ ...c, [relPath]: list }))
+      void reloadGit()
     },
-    [project.id, reloadRoot]
+    [project.id, reloadRoot, reloadGit]
   )
 
   // reset & load when project changes
@@ -53,7 +67,14 @@ export function FileTree({ project }: Props) {
     setCreatingAt(null)
     setRenaming(null)
     void reloadRoot()
-  }, [project.id, reloadRoot])
+    void reloadGit()
+  }, [project.id, reloadRoot, reloadGit])
+
+  useEffect(() => {
+    const onFocus = () => void reloadGit()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [reloadGit])
 
   const toggle = useCallback(
     async (entry: FsEntry) => {
@@ -122,10 +143,11 @@ export function FileTree({ project }: Props) {
         await window.api.fs.remove(project.id, target.path)
         const parent = parentOf(target.path)
         await reloadFolder(parent)
+        void reloadGit()
         return
       }
     },
-    [expanded, toggle, project.id, project.path, project.name, reloadFolder, openFile]
+    [expanded, toggle, project.id, project.path, project.name, reloadFolder, reloadGit, openFile]
   )
 
   const submitCreate = useCallback(
@@ -144,8 +166,9 @@ export function FileTree({ project }: Props) {
       }
       await reloadFolder(creatingAt.parent)
       setCreatingAt(null)
+      void reloadGit()
     },
-    [creatingAt, project.id, reloadFolder]
+    [creatingAt, project.id, reloadFolder, reloadGit]
   )
 
   const submitRename = useCallback(
@@ -167,9 +190,81 @@ export function FileTree({ project }: Props) {
           }
           return next
         })
+        void reloadGit()
       }
     },
-    [project.id, reloadFolder]
+    [project.id, reloadFolder, reloadGit]
+  )
+
+  const onTreeKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (renaming || creatingAt) return
+      const idx = visibleRows.findIndex((r) => r.path === selected)
+      const cur = idx >= 0 ? visibleRows[idx] : null
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelected(visibleRows[Math.min(visibleRows.length - 1, idx + 1)]?.path ?? selected)
+          return
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelected(visibleRows[Math.max(0, idx - 1)]?.path ?? selected)
+          return
+        case 'ArrowRight':
+          if (cur?.isDirectory && !expanded[cur.path]) {
+            e.preventDefault()
+            void toggle(cur)
+          }
+          return
+        case 'ArrowLeft':
+          if (cur?.isDirectory && expanded[cur.path]) {
+            e.preventDefault()
+            void toggle(cur)
+          }
+          return
+        case 'Enter':
+          if (cur) {
+            e.preventDefault()
+            if (cur.isDirectory) void toggle(cur)
+            else openFile({ projectId: project.id, path: cur.path })
+          }
+          return
+        case 'F2':
+          if (cur) {
+            e.preventDefault()
+            setRenaming(cur.path)
+          }
+          return
+        case 'Delete':
+        case 'Backspace':
+          if (cur && (e.key === 'Delete' || e.metaKey)) {
+            e.preventDefault()
+            void handleAction(cur, 'delete')
+          }
+          return
+      }
+      if ((e.key === 'n' || e.key === 'N') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        void handleAction(cur, 'new-file')
+        return
+      }
+      // Type-ahead: jump to next visible row whose name starts with the typed buffer.
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const now = Date.now()
+        const ta = typeAhead.current
+        ta.buffer = now - ta.at > 600 ? e.key : ta.buffer + e.key
+        ta.at = now
+        const lower = ta.buffer.toLowerCase()
+        const startFrom = idx >= 0 ? idx : 0
+        const order = [
+          ...visibleRows.slice(startFrom + 1),
+          ...visibleRows.slice(0, startFrom + 1),
+        ]
+        const hit = order.find((r) => r.name.toLowerCase().startsWith(lower))
+        if (hit) setSelected(hit.path)
+      }
+    },
+    [renaming, creatingAt, visibleRows, selected, expanded, toggle, openFile, project.id, handleAction]
   )
 
   return (
@@ -209,7 +304,9 @@ export function FileTree({ project }: Props) {
       </div>
 
       <div
-        className="flex-1 min-h-0 overflow-y-auto py-1 text-[13px]"
+        tabIndex={0}
+        onKeyDown={onTreeKey}
+        className="flex-1 min-h-0 overflow-y-auto py-1 text-[13px] outline-none"
         onContextMenu={(e) => {
           e.preventDefault()
           setMenu({ x: e.clientX, y: e.clientY, target: null })
@@ -236,10 +333,13 @@ export function FileTree({ project }: Props) {
             depth={0}
             expanded={expanded}
             children_={children}
+            gitStatus={gitStatus}
+            selected={selected}
             renaming={renaming}
             creatingAt={creatingAt}
             onToggle={toggle}
             onOpen={(e) => {
+              setSelected(e.path)
               if (e.isDirectory) void toggle(e)
               else openFile({ projectId: project.id, path: e.path })
             }}
@@ -302,6 +402,8 @@ interface TreeRowProps {
   depth: number
   expanded: Record<string, boolean>
   children_: ChildrenMap
+  gitStatus: GitFileStatusMap
+  selected: string | null
   renaming: string | null
   creatingAt: { parent: string; kind: 'file' | 'folder' } | null
   activePath: string | null
@@ -319,6 +421,8 @@ function TreeRow({
   depth,
   expanded,
   children_,
+  gitStatus,
+  selected,
   renaming,
   creatingAt,
   activePath,
@@ -333,6 +437,11 @@ function TreeRow({
   const isOpen = !!expanded[entry.path]
   const kids = children_[entry.path]
   const isActive = !entry.isDirectory && activePath === entry.path
+  const isSelected = entry.path === selected
+  const status = entry.isDirectory
+    ? folderStatus(entry.path, gitStatus)
+    : gitStatus[entry.path]
+  const color = statusColor(status)
 
   return (
     <div>
@@ -352,6 +461,7 @@ function TreeRow({
           className={[
             'group/row flex items-center w-full pr-2 py-[3px] text-left',
             isActive ? 'bg-foreground/10' : 'hover:bg-foreground/5',
+            isSelected ? 'ring-1 ring-inset ring-accent/40' : '',
           ].join(' ')}
           style={{ paddingLeft: 8 + depth * 12 }}
         >
@@ -380,12 +490,14 @@ function TreeRow({
           <span
             className={[
               'truncate',
+              status === 'deleted' ? 'line-through' : '',
               entry.ignored
                 ? 'text-foreground/40 group-hover/row:text-foreground/60'
                 : isActive
                   ? 'text-foreground'
                   : 'text-foreground/85 group-hover/row:text-foreground',
             ].join(' ')}
+            style={{ color }}
           >
             {entry.name}
           </span>
@@ -417,6 +529,8 @@ function TreeRow({
                 depth={depth + 1}
                 expanded={expanded}
                 children_={children_}
+                gitStatus={gitStatus}
+                selected={selected}
                 renaming={renaming}
                 creatingAt={creatingAt}
                 activePath={activePath}
@@ -620,4 +734,48 @@ function MenuDivider() {
 function parentOf(p: string): string {
   const i = p.lastIndexOf('/')
   return i < 0 ? '' : p.slice(0, i)
+}
+
+function flattenVisible(
+  roots: FsEntry[],
+  children: ChildrenMap,
+  expanded: Record<string, boolean>
+): FsEntry[] {
+  const out: FsEntry[] = []
+  const walk = (entries: FsEntry[]): void => {
+    for (const e of entries) {
+      out.push(e)
+      if (e.isDirectory && expanded[e.path]) {
+        const kids = children[e.path]
+        if (kids) walk(kids)
+      }
+    }
+  }
+  walk(roots)
+  return out
+}
+
+function statusColor(s?: GitFileStatus): string | undefined {
+  switch (s) {
+    case 'modified':
+      return 'var(--git-modified)'
+    case 'added':
+    case 'untracked':
+      return 'var(--git-added)'
+    case 'deleted':
+      return 'var(--git-deleted)'
+    case 'conflict':
+      return 'var(--git-conflict)'
+    default:
+      return undefined
+  }
+}
+
+/** A folder is "dirty" if any changed path sits under it. */
+function folderStatus(path: string, map: GitFileStatusMap): GitFileStatus | undefined {
+  const prefix = path + '/'
+  for (const key of Object.keys(map)) {
+    if (key.startsWith(prefix)) return 'modified'
+  }
+  return undefined
 }

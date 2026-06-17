@@ -37,7 +37,10 @@ const extForBlob = (b: { type: string; name?: string }): string => {
 interface Props {
   terminalId: string
   active: boolean
-  onBell?: () => void
+  // 'attention' = the agent's turn finished and it wants your input (fires a
+  // desktop notification). 'bell' = a raw terminal BEL — a generic unread cue
+  // only, since editors/shells ring it during ordinary typing.
+  onBell?: (kind: 'bell' | 'attention') => void
 }
 
 // Parse `OSC 9 ; 4 ; <state> ; <progress> ST`. States: 0=clear, 1=normal,
@@ -110,10 +113,6 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
   const initRef = useRef(false)
   const bellRef = useRef<typeof onBell>(onBell)
   bellRef.current = onBell
-  // Kept in a ref so the long-lived onTitleChange handler can read the current
-  // value without being re-created on every active/inactive toggle.
-  const activeRef = useRef(active)
-  activeRef.current = active
 
   useEffect(() => {
     if (!hostRef.current || initRef.current) return
@@ -227,7 +226,11 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
     })
 
     const bellDisposable = term.onBell(() => {
-      bellRef.current?.()
+      // A raw BEL fires on all sorts of keystrokes (empty backspace, hitting an
+      // input boundary) while the program is idle, so it must NOT pop a "wants
+      // your input" notification — it only marks the tab unread. The real
+      // attention signal is the title working→idle edge below.
+      bellRef.current?.('bell')
     })
 
     const setBusy = (busy: boolean): void => {
@@ -236,9 +239,9 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
 
     // The window title is both the tab label and — for agent TUIs like Claude
     // Code — our "working" signal (see titleIndicatesWork). Drive the busy
-    // indicator off it, and on the working→idle edge (turn finished / wants
-    // attention) fire a notification, but only when this terminal isn't the one
-    // the user is already looking at.
+    // indicator off it, and on the working→idle edge (turn finished) raise the
+    // 'attention' signal. Whether that actually notifies is decided by the
+    // handler, which suppresses terminals the user is already looking at.
     const setTitle = useWorkspace.getState().setTerminalTitle
     let titleWorking = false
     const titleDisposable = term.onTitleChange((title) => {
@@ -246,8 +249,8 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       const working = titleIndicatesWork(title)
       if (working === titleWorking) return
       setBusy(working)
-      if (titleWorking && !working && !(activeRef.current && document.hasFocus())) {
-        bellRef.current?.()
+      if (titleWorking && !working) {
+        bellRef.current?.('attention')
       }
       titleWorking = working
     })

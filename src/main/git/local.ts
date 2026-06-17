@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import type { GitInfo } from '@shared/types'
+import type { GitFileStatusMap, GitInfo } from '@shared/types'
+import { parsePorcelainStatus } from './parse-status'
 
 interface RunResult {
   code: number
@@ -119,4 +120,10 @@ export async function pushCurrentBranch(
     ok: res.code === 0,
     output: (res.stdout + (res.stderr ? '\n' + res.stderr : '')).trim(),
   }
+}
+
+export async function getFileStatus(cwd: string): Promise<GitFileStatusMap> {
+  const res = await git(['status', '--porcelain=v1', '-z'], cwd)
+  if (res.code !== 0) return {}
+  return parsePorcelainStatus(res.stdout)
 }

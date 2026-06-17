@@ -54,9 +54,18 @@ export function registerProjectIpc(): void {
     })
   })
 
-  ipcMain.handle(IPC.projects.select, (_e, id: ProjectId | null): void => {
+  ipcMain.handle(IPC.projects.reorder, (_e, orderedIds: ProjectId[]): void => {
     mutate((s) => {
-      s.selectedProjectId = id
+      const byId = new Map(s.projects.map((p) => [p.id, p]))
+      // Default (Home) projects stay pinned to the front; user projects follow
+      // the requested order, with any not named appended (defensive).
+      const defaults = s.projects.filter((p) => p.isDefault)
+      const ordered = orderedIds
+        .map((id) => byId.get(id))
+        .filter((p): p is Project => !!p && !p.isDefault)
+      const orderedSet = new Set(ordered.map((p) => p.id))
+      const remaining = s.projects.filter((p) => !p.isDefault && !orderedSet.has(p.id))
+      s.projects = [...defaults, ...ordered, ...remaining]
     })
   })
 }

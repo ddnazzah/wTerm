@@ -10,6 +10,7 @@ import {
 } from '@shared/types'
 import { getProject, mutate, removeTerminal, upsertTerminal } from '../store/state'
 import { getDefaultShell } from '../pty/shell-integration'
+import { buildResumeCommand, isClaudeLaunch, withSessionId } from '../pty/claude-session'
 import type { PtyManager } from '../pty/manager'
 
 /** Resolve a project-relative cwd, refusing anything that escapes the project root. */
@@ -28,16 +29,53 @@ export function registerTerminalIpc(pty: PtyManager): void {
       const project = getProject(opts.projectId)
       if (!project) return null
 
-      const id = randomUUID()
       const shell = opts.shell ?? getDefaultShell()
       const cwd = resolveCwd(project.path, opts.cwd)
+
+      // Restore path: rebuild a persisted Claude tab, reusing its id so the
+      // recreated PTY lines up with the existing record and active-tab state.
+      if (opts.id && opts.resumeSessionId) {
+        const existing = project.terminals.find((t) => t.id === opts.id)
+        const record: TerminalRecord = {
+          id: opts.id,
+          name: existing?.name ?? opts.name ?? `Terminal ${project.terminals.length + 1}`,
+          shell: existing?.shell ?? shell,
+          claudeSessionId: opts.resumeSessionId,
+        }
+        upsertTerminal(project.id, record)
+        pty.create({
+          id: opts.id,
+          cwd,
+          shell: record.shell,
+          startupCommand: buildResumeCommand(opts.startupCommand, opts.resumeSessionId),
+        })
+        return record
+      }
+
+      // New tab. When it launches Claude, generate and pin a session id so the
+      // transcript is ours to resume after a restart (see pty/claude-session.ts).
+      // We only claim ownership when we actually injected the id — if the user's
+      // command already pins a session, withSessionId leaves it untouched and we
+      // must not record an id we don't control.
+      const id = randomUUID()
+      let claudeSessionId: string | undefined
+      let startupCommand = opts.startupCommand
+      if (isClaudeLaunch(opts.startupCommand) && opts.startupCommand) {
+        const candidate = randomUUID()
+        const injected = withSessionId(opts.startupCommand, candidate)
+        if (injected !== opts.startupCommand) {
+          claudeSessionId = candidate
+          startupCommand = injected
+        }
+      }
       const record: TerminalRecord = {
         id,
         name: opts.name ?? `Terminal ${project.terminals.length + 1}`,
         shell,
+        ...(claudeSessionId ? { claudeSessionId } : {}),
       }
       upsertTerminal(project.id, record)
-      pty.create({ id, cwd, shell, startupCommand: opts.startupCommand })
+      pty.create({ id, cwd, shell, startupCommand })
       return record
     }
   )

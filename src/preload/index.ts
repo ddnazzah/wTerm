@@ -8,6 +8,7 @@ import {
   type DeviceFlowStart,
   type FocusTerminalPayload,
   type FsEntry,
+  type GitFileStatusMap,
   type GitInfo,
   type GitHubSettings,
   type NotifyPayload,
@@ -34,6 +35,8 @@ const api = {
       ipcRenderer.invoke(IPC.projects.remove, id),
     rename: (id: ProjectId, name: string): Promise<void> =>
       ipcRenderer.invoke(IPC.projects.rename, id, name),
+    reorder: (orderedIds: ProjectId[]): Promise<void> =>
+      ipcRenderer.invoke(IPC.projects.reorder, orderedIds),
     select: (id: ProjectId | null): Promise<void> =>
       ipcRenderer.invoke(IPC.projects.select, id),
     openInITerm: (id: ProjectId): Promise<void> =>
@@ -127,6 +130,8 @@ const api = {
       ipcRenderer.invoke(IPC.git.info, projectId),
     push: (projectId: ProjectId, branch: string): Promise<{ ok: boolean; output: string }> =>
       ipcRenderer.invoke(IPC.git.push, projectId, branch),
+    fileStatus: (projectId: ProjectId): Promise<GitFileStatusMap> =>
+      ipcRenderer.invoke(IPC.git.fileStatus, projectId),
   },
   github: {
     getSettings: (): Promise<GitHubSettings> => ipcRenderer.invoke(IPC.github.getSettings),
