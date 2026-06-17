@@ -81,6 +81,10 @@ jobs:
         # tries to auto-publish on tag builds and fails on a missing GH_TOKEN.
         run: pnpm run build:icons && pnpm exec electron-vite build && pnpm exec electron-builder --mac --publish never
         env:
+          # Bundling the Monaco editor blows past Node's default heap on the
+          # 7 GB macOS runner (V8 FatalProcessOutOfMemory during electron-vite
+          # build). Raise the old-space cap; 6 GB leaves headroom for the OS.
+          NODE_OPTIONS: --max-old-space-size=6144
           # Developer ID cert (base64 .p12) + its password. electron-builder
           # imports it into a temp keychain and auto-discovers the identity.
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -94,6 +98,9 @@ jobs:
         if: runner.os == 'Windows'
         run: pnpm run build:icons && pnpm exec electron-vite build && pnpm exec electron-builder --win --publish never
         env:
+          # Match the macOS build's heap bump — the Monaco bundle is the same
+          # size on both platforms; keep them consistent so Windows can't OOM later.
+          NODE_OPTIONS: --max-old-space-size=6144
           # No Windows code-signing cert configured; produce an unsigned
           # installer. SmartScreen warns on first launch — see RELEASE_NOTES.md.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
