@@ -42,15 +42,21 @@ export async function loadState(): Promise<AppState> {
     const raw = await fs.readFile(statePath(), 'utf-8')
     const parsed = JSON.parse(raw) as AppState
     if (parsed?.version === 1 && Array.isArray(parsed.projects)) {
-      // Terminals are session-scoped — their PTYs die on close and we no longer
-      // restore them. Drop any persisted terminal records (and the stale
-      // active-tab map) on load so old/killed terminals never reappear, even
-      // from a state.json written before terminal-restore was removed.
-      cache = {
-        ...parsed,
-        projects: parsed.projects.map((p) => ({ ...p, terminals: [] })),
-        activeTerminalByProject: {},
-      }
+      // Only Claude tabs are restorable: a bare shell can't be resumed
+      // meaningfully (its program is gone), but a Claude tab can be brought back
+      // via `claude --resume <claudeSessionId>`. Drop every other terminal on
+      // load, and keep the active-tab map only for ids that survived.
+      const projects = parsed.projects.map((p) => ({
+        ...p,
+        terminals: (p.terminals ?? []).filter((t) => t.claudeSessionId),
+      }))
+      const survivingIds = new Set(projects.flatMap((p) => p.terminals.map((t) => t.id)))
+      const activeTerminalByProject = Object.fromEntries(
+        Object.entries(parsed.activeTerminalByProject ?? {}).filter(
+          ([, id]) => id != null && survivingIds.has(id)
+        )
+      )
+      cache = { ...parsed, projects, activeTerminalByProject }
     }
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -91,16 +97,19 @@ function scheduleSave(): void {
 async function writeFile(): Promise<void> {
   const target = statePath()
   const tmp = `${target}.tmp`
-  // Terminals are session-scoped: their PTYs die when the app closes and we no
-  // longer restore them, so persist projects with their terminal records (and
-  // the now-meaningless active-tab map) stripped out.
-  const persisted: AppState = {
-    ...cache,
-    projects: cache.projects
-      .filter((p) => !p.isDefault)
-      .map((p) => ({ ...p, terminals: [] })),
-    activeTerminalByProject: {},
-  }
+  // Persist only Claude tabs (those carry a claudeSessionId) so they can be
+  // resumed next launch; bare-shell tabs stay session-scoped and are dropped.
+  // The Home workspace is synthesized fresh each launch and never persisted.
+  const projects = cache.projects
+    .filter((p) => !p.isDefault)
+    .map((p) => ({ ...p, terminals: p.terminals.filter((t) => t.claudeSessionId) }))
+  const survivingIds = new Set(projects.flatMap((p) => p.terminals.map((t) => t.id)))
+  const activeTerminalByProject = Object.fromEntries(
+    Object.entries(cache.activeTerminalByProject ?? {}).filter(
+      ([, id]) => id != null && survivingIds.has(id)
+    )
+  )
+  const persisted: AppState = { ...cache, projects, activeTerminalByProject }
   const json = JSON.stringify(persisted, null, 2)
   await fs.mkdir(join(target, '..'), { recursive: true }).catch(() => {})
   await fs.writeFile(tmp, json, 'utf-8')

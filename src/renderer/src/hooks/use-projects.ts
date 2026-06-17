@@ -1,5 +1,13 @@
 import { useCallback, useEffect } from 'react'
 import { useWorkspace } from '@renderer/state/store'
+import { useSettings } from '@renderer/state/settings'
+
+// useProjects is consumed by more than one component, so its bootstrap effect
+// runs once per consumer. Restoring Claude tabs must happen exactly once per app
+// launch (not once per consumer), so guard it with a module-level flag that
+// outlives individual mounts. pty.create is also idempotent on terminal id, but
+// we avoid the duplicate IPC round-trips entirely.
+let claudeRestoreStarted = false
 
 export function useProjects() {
   const projects = useWorkspace((s) => s.projects)
@@ -18,6 +26,27 @@ export function useProjects() {
         selectedProjectId: snapshot.selectedProjectId,
         activeTerminalByProject: snapshot.activeTerminalByProject ?? {},
       })
+
+      // Bring back Claude tabs from the previous session: each persisted tab
+      // carries the session id wTerm launched it with, so we recreate its PTY
+      // running `claude --resume <id>`. Reuse the persisted tab id so the
+      // recreated PTY lines up with the tab the snapshot just rendered. Run this
+      // at most once per launch even though multiple components mount this hook.
+      if (claudeRestoreStarted) return
+      claudeRestoreStarted = true
+      const startupCommand = useSettings.getState().terminal.startupCommand.trim() || undefined
+      for (const project of snapshot.projects) {
+        for (const terminal of project.terminals) {
+          if (!terminal.claudeSessionId) continue
+          void window.api.terminals.create({
+            projectId: project.id,
+            id: terminal.id,
+            name: terminal.name,
+            resumeSessionId: terminal.claudeSessionId,
+            startupCommand,
+          })
+        }
+      }
     })
     return () => {
       cancelled = true

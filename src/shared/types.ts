@@ -14,6 +14,14 @@ export interface TerminalRecord {
   id: TerminalId
   name: string
   shell: string
+  /**
+   * The Claude Code session id wTerm launched this tab with (`--session-id`).
+   * Present only for tabs whose startup command launched `claude`; its presence
+   * marks the tab as a restorable Claude session — on the next launch the tab is
+   * recreated running `claude --resume <id>`. Bare-shell tabs leave this unset
+   * and remain session-scoped (not restored).
+   */
+  claudeSessionId?: string
 }
 
 export interface Project {
@@ -40,10 +48,23 @@ export interface CreateTerminalOptions {
   /** working directory, relative to the project root; defaults to the project root */
   cwd?: string
   /**
-   * Command (or multi-line script) to run once the shell is ready. Only applied
-   * to freshly created tabs — never to terminals restored from a prior session.
+   * Command (or multi-line script) to run once the shell is ready. For a brand
+   * new tab this is the user's configured startup command; when {@link resumeSessionId}
+   * is set it is the base used to rebuild the `claude --resume` command.
    */
   startupCommand?: string
+  /**
+   * Reuse this exact terminal id instead of generating a new one. Set only on
+   * the restore path so the recreated PTY lines up with the persisted record,
+   * its tab, and the active-tab selection.
+   */
+  id?: TerminalId
+  /**
+   * Restore mode: resume the Claude session with this id. The PTY is launched
+   * with `claude --resume <resumeSessionId>` (built from {@link startupCommand}),
+   * and the record's {@link TerminalRecord.claudeSessionId} is preserved.
+   */
+  resumeSessionId?: string
 }
 
 export type TerminalDataPayload = { id: TerminalId; data: string }
@@ -55,6 +76,7 @@ export const IPC = {
     add: 'projects:add',
     remove: 'projects:remove',
     rename: 'projects:rename',
+    reorder: 'projects:reorder',
     select: 'projects:select',
     openInITerm: 'projects:open-in-iterm',
     openInFinder: 'projects:open-in-finder',
