@@ -112,6 +112,7 @@ export const IPC = {
     status: 'bridge:status',
     getPairing: 'bridge:get-pairing',
     regeneratePairing: 'bridge:regenerate-pairing',
+    setKeepAwake: 'bridge:set-keep-awake',
   },
   update: {
     check: 'update:check',

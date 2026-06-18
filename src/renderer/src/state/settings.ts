@@ -35,8 +35,22 @@ export const TERMINAL_DEFAULTS: TerminalSettings = {
   startupCommand: '',
 }
 
+export interface MobileSettings {
+  /**
+   * Keep the Mac awake while a phone is connected to the mobile bridge, so the
+   * session stays reachable when you step out. The blocker is only held while at
+   * least one phone is actually connected (it doesn't drain battery otherwise).
+   */
+  keepAwake: boolean
+}
+
+export const MOBILE_DEFAULTS: MobileSettings = {
+  keepAwake: false,
+}
+
 const STORAGE_KEY = 'tw:editor-settings'
 const TERMINAL_STORAGE_KEY = 'tw:terminal-settings'
+const MOBILE_STORAGE_KEY = 'tw:mobile-settings'
 
 function readStored(): EditorSettings {
   try {
@@ -76,17 +90,39 @@ function persistTerminal(s: TerminalSettings): void {
   }
 }
 
+function readStoredMobile(): MobileSettings {
+  try {
+    const raw = localStorage.getItem(MOBILE_STORAGE_KEY)
+    if (!raw) return MOBILE_DEFAULTS
+    const parsed = JSON.parse(raw) as Partial<MobileSettings>
+    return { ...MOBILE_DEFAULTS, ...parsed }
+  } catch {
+    return MOBILE_DEFAULTS
+  }
+}
+
+function persistMobile(s: MobileSettings): void {
+  try {
+    localStorage.setItem(MOBILE_STORAGE_KEY, JSON.stringify(s))
+  } catch {
+    // ignore
+  }
+}
+
 interface SettingsState {
   editor: EditorSettings
   terminal: TerminalSettings
+  mobile: MobileSettings
   updateEditor: (patch: Partial<EditorSettings>) => void
   resetEditor: () => void
   updateTerminal: (patch: Partial<TerminalSettings>) => void
+  updateMobile: (patch: Partial<MobileSettings>) => void
 }
 
 export const useSettings = create<SettingsState>((set) => ({
   editor: readStored(),
   terminal: readStoredTerminal(),
+  mobile: readStoredMobile(),
   updateEditor: (patch) =>
     set((state) => {
       const next = { ...state.editor, ...patch }
@@ -103,5 +139,11 @@ export const useSettings = create<SettingsState>((set) => ({
       const next = { ...state.terminal, ...patch }
       persistTerminal(next)
       return { terminal: next }
+    }),
+  updateMobile: (patch) =>
+    set((state) => {
+      const next = { ...state.mobile, ...patch }
+      persistMobile(next)
+      return { mobile: next }
     }),
 }))

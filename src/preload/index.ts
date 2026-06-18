@@ -94,6 +94,8 @@ const api = {
     getPairing: (): Promise<BridgePairing> => ipcRenderer.invoke(IPC.bridge.getPairing),
     regeneratePairing: (): Promise<BridgePairing> =>
       ipcRenderer.invoke(IPC.bridge.regeneratePairing),
+    setKeepAwake: (enabled: boolean): Promise<void> =>
+      ipcRenderer.invoke(IPC.bridge.setKeepAwake, enabled),
     onStatus: (cb: (status: BridgeStatus) => void): (() => void) => {
       const listener = (_: unknown, status: BridgeStatus) => cb(status)
       ipcRenderer.on(IPC.bridge.status, listener)

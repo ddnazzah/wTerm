@@ -1,3 +1,4 @@
+import { powerSaveBlocker } from 'electron'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promises as fs } from 'node:fs'
 import { existsSync } from 'node:fs'
@@ -57,6 +58,11 @@ export class MobileBridge {
   // burst of wrong codes raises the bar further.
   private pairFailures = 0
   private pairLockedUntil = 0
+  // Keep-the-Mac-awake-while-a-phone-is-connected. The blocker is only held
+  // while keepAwake is on AND at least one client is connected, so it never
+  // drains the battery when nothing is watching.
+  private keepAwake = false
+  private powerBlockerId: number | null = null
 
   constructor(private readonly pty: PtyManager) {}
 
@@ -146,6 +152,29 @@ export class MobileBridge {
   async regeneratePairing(): Promise<BridgePairing> {
     await regeneratePairing()
     return this.getPairing()
+  }
+
+  setKeepAwake(enabled: boolean): void {
+    this.keepAwake = enabled
+    this.updatePowerBlocker()
+  }
+
+  /**
+   * Hold or release the power-save blocker based on the current setting + client
+   * count. 'prevent-app-suspension' keeps the system awake (network stays up)
+   * while still allowing the display to sleep — the macOS `caffeinate -s`
+   * equivalent.
+   */
+  private updatePowerBlocker(): void {
+    const shouldBlock = this.keepAwake && this.registry.size > 0
+    if (shouldBlock && this.powerBlockerId === null) {
+      this.powerBlockerId = powerSaveBlocker.start('prevent-app-suspension')
+    } else if (!shouldBlock && this.powerBlockerId !== null) {
+      if (powerSaveBlocker.isStarted(this.powerBlockerId)) {
+        powerSaveBlocker.stop(this.powerBlockerId)
+      }
+      this.powerBlockerId = null
+    }
   }
 
   // ---- HTTP ----
@@ -271,12 +300,17 @@ export class MobileBridge {
 
   private onConnection(ws: WebSocket): void {
     const client = this.registry.add(ws)
+    this.updatePowerBlocker()
     // Seed the phone with the current project/terminal structure.
     this.registry.sendTo(client, { type: 'hello', state: getState() })
 
+    const drop = (): void => {
+      this.registry.remove(client)
+      this.updatePowerBlocker()
+    }
     ws.on('message', (raw) => void this.onMessage(client, raw.toString()))
-    ws.on('close', () => this.registry.remove(client))
-    ws.on('error', () => this.registry.remove(client))
+    ws.on('close', drop)
+    ws.on('error', drop)
   }
 
   private async onMessage(client: BridgeClient, raw: string): Promise<void> {

@@ -14,6 +14,9 @@ export function registerBridgeIpc(bridge: MobileBridge, win: BrowserWindow): voi
     IPC.bridge.regeneratePairing,
     (): Promise<BridgePairing> => bridge.regeneratePairing()
   )
+  ipcMain.handle(IPC.bridge.setKeepAwake, (_e, enabled: boolean): void =>
+    bridge.setKeepAwake(enabled)
+  )
 
   const pushStatus = (): void => {
     void bridge.getStatus().then((status) => {

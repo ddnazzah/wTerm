@@ -199,6 +199,8 @@ function MobilePane() {
   const [pairing, setPairing] = useState<BridgePairing | null>(null)
   const [status, setStatus] = useState<BridgeStatus | null>(null)
   const [qr, setQr] = useState<string | null>(null)
+  const keepAwake = useSettings((s) => s.mobile.keepAwake)
+  const updateMobile = useSettings((s) => s.updateMobile)
 
   useEffect(() => {
     let alive = true
@@ -210,6 +212,16 @@ function MobilePane() {
       off()
     }
   }, [])
+
+  // Main starts each launch with keep-awake off; push the persisted preference
+  // so the blocker policy matches the toggle after a restart.
+  useEffect(() => {
+    void window.api.bridge.setKeepAwake(keepAwake)
+  }, [keepAwake])
+
+  const setKeepAwake = (v: boolean): void => {
+    updateMobile({ keepAwake: v })
+  }
 
   // Render the QR from the pair URL (origin + code) whenever it changes.
   useEffect(() => {
@@ -289,6 +301,15 @@ function MobilePane() {
           />
         )}
       </div>
+
+      <Divider />
+
+      <BoolField label="Keep this Mac awake while a phone is connected" value={keepAwake} onChange={setKeepAwake} />
+      <Hint>
+        Holds the system awake (the display can still sleep) only while a phone is actually
+        connected, so your terminals stay reachable when you step out. No effect when nothing is
+        connected.
+      </Hint>
 
       {!origin && (
         <>
