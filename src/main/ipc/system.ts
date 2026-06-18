@@ -69,6 +69,15 @@ export function registerSystemIpc(): void {
 
   ipcMain.handle(IPC.system.version, (): string => app.getVersion())
 
+  // Whole-window zoom. The renderer owns the persisted factor (localStorage) and
+  // sends the desired value; we clamp it and apply it to the calling window's
+  // webContents, returning the value actually applied.
+  ipcMain.handle(IPC.system.setZoom, (e, factor: number): number => {
+    const clamped = Math.min(2.5, Math.max(0.5, Number.isFinite(factor) ? factor : 1))
+    e.sender.setZoomFactor(clamped)
+    return clamped
+  })
+
   ipcMain.handle(IPC.system.openExternal, (_e, url: string): void => {
     if (typeof url !== 'string') return
     if (!/^https?:\/\//i.test(url)) return

@@ -8,7 +8,20 @@ interface Props {
   onClose: () => void
 }
 
+type CategoryId = 'appearance' | 'terminal' | 'editor' | 'formatting' | 'updates' | 'about'
+
+const CATEGORIES: { id: CategoryId; label: string }[] = [
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'editor', label: 'Editor' },
+  { id: 'formatting', label: 'Formatting' },
+  { id: 'updates', label: 'Updates' },
+  { id: 'about', label: 'About' },
+]
+
 export function SettingsModal({ open, onClose }: Props) {
+  const [active, setActive] = useState<CategoryId>('appearance')
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -28,93 +41,70 @@ export function SettingsModal({ open, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4"
       onClick={onClose}
     >
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        aria-hidden
-      />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden />
       <div
         role="dialog"
         aria-label="Settings"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl max-h-[82vh] overflow-y-auto rounded-2xl border border-foreground/15 bg-background shadow-2xl"
+        className="relative flex w-full max-w-3xl h-[72vh] max-h-[680px] overflow-hidden rounded-2xl border border-foreground/15 bg-background shadow-2xl"
       >
-        <header className="flex items-center justify-between px-8 py-5 border-b border-accent/14">
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Settings</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close settings"
-            className="flex items-center justify-center w-8 h-8 rounded-md text-foreground/55 hover:text-foreground hover:bg-foreground/10"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </header>
+        {/* Left category rail */}
+        <nav className="flex w-44 flex-shrink-0 flex-col gap-0.5 border-r border-accent/14 bg-foreground/[0.025] p-3">
+          <h2 className="px-2 pb-2 text-lg font-semibold tracking-tight text-foreground">Settings</h2>
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setActive(c.id)}
+              className={[
+                'rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors',
+                active === c.id
+                  ? 'bg-accent/15 text-foreground font-medium'
+                  : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
+              ].join(' ')}
+            >
+              {c.label}
+            </button>
+          ))}
+        </nav>
 
-        <div className="px-8 py-7 space-y-10">
-          <TerminalSection />
-          <EditorSection />
-          <FormattingSection />
-          <UpdatesSection />
+        {/* Right content pane */}
+        <div className="relative flex-1 min-w-0 flex flex-col">
+          <header className="flex items-center justify-between px-7 py-4 border-b border-accent/14 flex-shrink-0">
+            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+              {CATEGORIES.find((c) => c.id === active)?.label}
+            </h3>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close settings"
+              className="flex items-center justify-center w-8 h-8 rounded-md text-foreground/55 hover:text-foreground hover:bg-foreground/10"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </header>
+          <div className="flex-1 overflow-y-auto px-7 py-6">
+            {active === 'appearance' && <AppearancePane />}
+            {active === 'terminal' && <TerminalPane />}
+            {active === 'editor' && <EditorPane />}
+            {active === 'formatting' && <FormattingPane />}
+            {active === 'updates' && <UpdatesPane />}
+            {active === 'about' && <AboutPane />}
+          </div>
         </div>
-
-        <AboutFooter />
       </div>
     </div>
   )
 }
 
-function AboutFooter() {
-  const [version, setVersion] = useState<string | null>(null)
-  useEffect(() => {
-    let alive = true
-    void window.api.system.getVersion().then((v) => {
-      if (alive) setVersion(v)
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-  return (
-    <footer className="flex items-center justify-between px-8 py-4 border-t border-accent/14 text-[12px] text-foreground/45">
-      <span>wTerm</span>
-      <span className="tabular-nums">{version ? `v${version}` : ''}</span>
-    </footer>
-  )
-}
-
-function TerminalSection() {
-  const startupCommand = useSettings((s) => s.terminal.startupCommand)
-  const update = useSettings((s) => s.updateTerminal)
-  return (
-    <Section
-      title="Terminal"
-      actionLabel={startupCommand ? 'Clear' : undefined}
-      onAction={startupCommand ? () => update({ startupCommand: '' }) : undefined}
-    >
-      <TextAreaField
-        label="Startup command"
-        value={startupCommand}
-        placeholder="e.g. claude --dangerously-skip-permissions"
-        onChange={(v) => update({ startupCommand: v })}
-      />
-      <p className="text-[12px] leading-relaxed text-foreground/55">
-        Runs automatically in every new terminal tab once the shell is ready. Leave empty to
-        disable (the default). Multiple lines run as separate commands.
-      </p>
-    </Section>
-  )
-}
-
-function EditorSection() {
+function AppearancePane() {
   const settings = useSettings((s) => s.editor)
   const update = useSettings((s) => s.updateEditor)
-  const reset = useSettings((s) => s.resetEditor)
-
   return (
-    <Section title="Editor" actionLabel="Reset" onAction={reset}>
+    <Pane>
       <NumberField
         label="Font size"
         value={settings.fontSize}
@@ -124,59 +114,77 @@ function EditorSection() {
         unit="px"
         onChange={(v) => update({ fontSize: v })}
       />
+      <Hint>Applies to the in-app code editor. Use {kbd('=')} / {kbd('-')} to zoom the whole window.</Hint>
+      <Divider />
       <TextField
         label="Font family"
         value={settings.fontFamily}
         placeholder={DEFAULTS.fontFamily}
         onChange={(v) => update({ fontFamily: v || DEFAULTS.fontFamily })}
       />
-      <NumberField
-        label="Tab size"
-        value={settings.tabSize}
-        min={1}
-        max={8}
-        step={1}
-        onChange={(v) => update({ tabSize: v })}
-      />
-      <BoolField
-        label="Insert spaces"
-        value={settings.insertSpaces}
-        onChange={(v) => update({ insertSpaces: v })}
-      />
-      <BoolField
-        label="Word wrap"
-        value={settings.wordWrap}
-        onChange={(v) => update({ wordWrap: v })}
-      />
-      <BoolField
-        label="Line numbers"
-        value={settings.lineNumbers}
-        onChange={(v) => update({ lineNumbers: v })}
-      />
-    </Section>
+    </Pane>
   )
 }
 
-function FormattingSection() {
+function TerminalPane() {
+  const startupCommand = useSettings((s) => s.terminal.startupCommand)
+  const update = useSettings((s) => s.updateTerminal)
+  return (
+    <Pane>
+      <FieldRowHeader
+        label="Startup command"
+        actionLabel={startupCommand ? 'Clear' : undefined}
+        onAction={startupCommand ? () => update({ startupCommand: '' }) : undefined}
+      />
+      <TextAreaField
+        value={startupCommand}
+        placeholder="e.g. claude --dangerously-skip-permissions"
+        onChange={(v) => update({ startupCommand: v })}
+      />
+      <Hint>
+        Runs automatically in every new terminal tab once the shell is ready. Leave empty to disable
+        (the default). Multiple lines run as separate commands.
+      </Hint>
+    </Pane>
+  )
+}
+
+function EditorPane() {
+  const settings = useSettings((s) => s.editor)
+  const update = useSettings((s) => s.updateEditor)
+  const reset = useSettings((s) => s.resetEditor)
+  return (
+    <Pane>
+      <div className="flex justify-end -mt-1">
+        <button type="button" onClick={reset} className="text-[11px] text-foreground/50 hover:text-foreground">
+          Reset to defaults
+        </button>
+      </div>
+      <NumberField label="Tab size" value={settings.tabSize} min={1} max={8} step={1} onChange={(v) => update({ tabSize: v })} />
+      <BoolField label="Insert spaces" value={settings.insertSpaces} onChange={(v) => update({ insertSpaces: v })} />
+      <BoolField label="Word wrap" value={settings.wordWrap} onChange={(v) => update({ wordWrap: v })} />
+      <BoolField label="Line numbers" value={settings.lineNumbers} onChange={(v) => update({ lineNumbers: v })} />
+      <BoolField label="Minimap" value={settings.minimap} onChange={(v) => update({ minimap: v })} />
+    </Pane>
+  )
+}
+
+function FormattingPane() {
   const formatOnSave = useSettings((s) => s.editor.formatOnSave)
   const update = useSettings((s) => s.updateEditor)
   return (
-    <Section title="Formatting">
-      <BoolField
-        label="Format on save"
-        value={formatOnSave}
-        onChange={(v: boolean) => update({ formatOnSave: v })}
-      />
-      <p className="text-[12px] leading-relaxed text-foreground/55">
+    <Pane>
+      <BoolField label="Format on save" value={formatOnSave} onChange={(v: boolean) => update({ formatOnSave: v })} />
+      <Hint>
         Uses Prettier for JavaScript, TypeScript, JSON, CSS, HTML, Markdown, and YAML. Use{' '}
-        <kbd className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/80 text-[11px]">{kbd('F', { shift: true })}</kbd> to
-        format the active file on demand.
-      </p>
-    </Section>
+        <kbd className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/80 text-[11px]">{kbd('F', { shift: true })}</kbd>{' '}
+        to format the active file on demand.
+      </Hint>
+    </Pane>
   )
 }
 
-function UpdatesSection() {
+function UpdatesPane() {
   const [version, setVersion] = useState<string | null>(null)
   const status = useUpdates((s) => s.status)
   const check = useUpdates((s) => s.check)
@@ -195,7 +203,7 @@ function UpdatesSection() {
   const busy = status.state === 'checking' || status.state === 'available' || status.state === 'downloading'
 
   return (
-    <Section title="Updates">
+    <Pane>
       <div className="flex items-center gap-3">
         <label className="text-[13px] text-foreground/80 flex-1">Current version</label>
         <span className="text-[13px] text-foreground/60 tabular-nums">{version ? `v${version}` : '—'}</span>
@@ -221,7 +229,29 @@ function UpdatesSection() {
           </button>
         )}
       </div>
-    </Section>
+    </Pane>
+  )
+}
+
+function AboutPane() {
+  const [version, setVersion] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    void window.api.system.getVersion().then((v) => {
+      if (alive) setVersion(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return (
+    <Pane>
+      <div className="flex items-center gap-3">
+        <span className="text-[13px] text-foreground/80 flex-1">wTerm</span>
+        <span className="text-[13px] text-foreground/60 tabular-nums">{version ? `v${version}` : ''}</span>
+      </div>
+      <Hint>Multi-project, multi-terminal workspace IDE.</Hint>
+    </Pane>
   )
 }
 
@@ -248,35 +278,36 @@ function updateStatusLabel(status: ReturnType<typeof useUpdates.getState>['statu
 
 // ---- primitives ----
 
-function Section({
-  title,
-  children,
+function Pane({ children }: { children: React.ReactNode }) {
+  return <div className="space-y-4">{children}</div>
+}
+
+function Divider() {
+  return <div className="border-t border-accent/10" />
+}
+
+function Hint({ children }: { children: React.ReactNode }) {
+  return <p className="text-[12px] leading-relaxed text-foreground/55">{children}</p>
+}
+
+function FieldRowHeader({
+  label,
   actionLabel,
   onAction,
 }: {
-  title: string
-  children: React.ReactNode
+  label: string
   actionLabel?: string
   onAction?: () => void
 }) {
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[11px] uppercase tracking-[0.12em] text-foreground/50 font-semibold">
-          {title}
-        </h3>
-        {actionLabel && onAction && (
-          <button
-            type="button"
-            onClick={onAction}
-            className="text-[11px] text-foreground/50 hover:text-foreground"
-          >
-            {actionLabel}
-          </button>
-        )}
-      </div>
-      <div className="space-y-4">{children}</div>
-    </section>
+    <div className="flex items-center justify-between">
+      <label className="text-[13px] text-foreground/80">{label}</label>
+      {actionLabel && onAction && (
+        <button type="button" onClick={onAction} className="text-[11px] text-foreground/50 hover:text-foreground">
+          {actionLabel}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -343,28 +374,23 @@ function TextField({
 }
 
 function TextAreaField({
-  label,
   value,
   placeholder,
   onChange,
 }: {
-  label: string
   value: string
   placeholder?: string
   onChange: (v: string) => void
 }) {
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-[13px] text-foreground/80">{label}</label>
-      <textarea
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        rows={3}
-        onChange={(e) => onChange(e.target.value)}
-        className="resize-y min-h-[72px] bg-foreground/5 text-[13px] px-2.5 py-2 rounded-md outline-none focus:bg-foreground/10 font-mono leading-relaxed"
-      />
-    </div>
+    <textarea
+      value={value}
+      placeholder={placeholder}
+      spellCheck={false}
+      rows={3}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full resize-y min-h-[72px] bg-foreground/5 text-[13px] px-2.5 py-2 rounded-md outline-none focus:bg-foreground/10 font-mono leading-relaxed"
+    />
   )
 }
 

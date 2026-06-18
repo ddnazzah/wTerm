@@ -8,12 +8,12 @@ interface Props {
 const MODES: { mode: EditorViewMode; title: string; icon: ReactNode }[] = [
   {
     mode: 'docked',
-    title: 'Dock — split above the terminal',
-    // Panel split: frame with a divider near the bottom.
+    title: 'Dock — split beside the terminal',
+    // Panel split: frame with a vertical divider (editor on the right).
     icon: (
       <>
         <rect x="3" y="4" width="18" height="16" rx="1.5" />
-        <path d="M3 14h18" />
+        <path d="M13 4v16" />
       </>
     ),
   },
@@ -34,6 +34,7 @@ const MODES: { mode: EditorViewMode; title: string; icon: ReactNode }[] = [
 export function EditorChrome({ onClose }: Props) {
   const viewMode = useWorkspace((s) => s.editorViewMode)
   const setViewMode = useWorkspace((s) => s.setEditorViewMode)
+  const exitFullscreen = useWorkspace((s) => s.exitFullscreen)
   return (
     <div className="flex items-center gap-1 px-2 flex-shrink-0">
       <div className="flex items-center gap-0.5 rounded-md bg-foreground/5 p-0.5">
@@ -41,9 +42,12 @@ export function EditorChrome({ onClose }: Props) {
           <button
             key={mode}
             type="button"
-            title={title}
+            title={mode === 'fullscreen' && viewMode === 'fullscreen' ? 'Exit fullscreen (Esc)' : title}
             aria-pressed={viewMode === mode}
-            onClick={() => setViewMode(mode)}
+            // Clicking the active fullscreen button toggles back to the prior mode.
+            onClick={() =>
+              mode === 'fullscreen' && viewMode === 'fullscreen' ? exitFullscreen() : setViewMode(mode)
+            }
             className={[
               'flex items-center justify-center w-6 h-6 rounded transition-colors',
               viewMode === mode

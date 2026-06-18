@@ -21,7 +21,9 @@ export function DockedEditor({ projectId, onClose, children }: Props) {
   const onMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging.current || !hostRef.current) return
     const rect = hostRef.current.getBoundingClientRect()
-    setRatio((e.clientY - rect.top) / rect.height)
+    // `ratio` is the editor's fraction of the width; the editor sits on the
+    // right, so dragging the divider left (toward the terminal) grows it.
+    setRatio((rect.right - e.clientX) / rect.width)
   }, [setRatio])
   const onUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     dragging.current = false
@@ -29,21 +31,21 @@ export function DockedEditor({ projectId, onClose, children }: Props) {
   }, [])
 
   return (
-    <div ref={hostRef} className="flex flex-col h-full min-h-0">
-      <div style={{ flexBasis: `${ratio * 100}%` }} className="min-h-0 overflow-hidden">
-        <EditorShell projectId={projectId} onClose={onClose} />
-      </div>
+    <div ref={hostRef} className="flex flex-row h-full min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">{children}</div>
       <div
         role="separator"
-        aria-orientation="horizontal"
+        aria-orientation="vertical"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        className="h-1 cursor-row-resize bg-accent/10 hover:bg-accent/30 transition-colors flex-shrink-0"
+        className="w-1 cursor-col-resize bg-accent/10 hover:bg-accent/30 transition-colors flex-shrink-0"
         style={{ touchAction: 'none' }}
       />
-      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+      <div style={{ flexBasis: `${ratio * 100}%` }} className="min-w-0 overflow-hidden flex-shrink-0">
+        <EditorShell projectId={projectId} onClose={onClose} />
+      </div>
     </div>
   )
 }

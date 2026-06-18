@@ -183,7 +183,11 @@ interface WorkspaceState {
   setFileModalSize: (width: number, height: number) => void
 
   editorViewMode: EditorViewMode
+  /** The non-fullscreen mode to fall back to when leaving fullscreen. */
+  previousEditorViewMode: EditorViewMode
   setEditorViewMode: (m: EditorViewMode) => void
+  /** Leave fullscreen, restoring the mode that was active before entering it. */
+  exitFullscreen: () => void
   dockSplitRatio: number
   setDockSplitRatio: (r: number) => void
   reorderFile: (projectId: string, from: number, to: number) => void
@@ -330,9 +334,25 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   },
 
   editorViewMode: readEditorViewMode(),
+  previousEditorViewMode: readEditorViewMode() === 'fullscreen' ? 'modal' : readEditorViewMode(),
   setEditorViewMode: (m) => {
     localStorage.setItem(EDITOR_VIEW_MODE_KEY, m)
-    set({ editorViewMode: m })
+    set((state) => ({
+      editorViewMode: m,
+      // Remember where we came from so exitFullscreen can return there.
+      previousEditorViewMode:
+        m === 'fullscreen' && state.editorViewMode !== 'fullscreen'
+          ? state.editorViewMode
+          : state.previousEditorViewMode,
+    }))
+  },
+  exitFullscreen: () => {
+    set((state) => {
+      if (state.editorViewMode !== 'fullscreen') return state
+      const target = state.previousEditorViewMode === 'fullscreen' ? 'modal' : state.previousEditorViewMode
+      localStorage.setItem(EDITOR_VIEW_MODE_KEY, target)
+      return { editorViewMode: target }
+    })
   },
   dockSplitRatio: readDockSplitRatio(),
   setDockSplitRatio: (r) => {

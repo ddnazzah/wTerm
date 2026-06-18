@@ -12,6 +12,7 @@ import { DockedEditor } from './components/workspace/docked-editor'
 import { EditorOverlay } from './components/workspace/editor-surface'
 import { BottomPanel } from './components/workspace/bottom-panel'
 import { useProjects } from './hooks/use-projects'
+import { useWindowZoom } from './lib/zoom'
 import { createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { HOME_PROJECT_ID, type Project, type TerminalRecord } from '@shared/types'
 
@@ -36,6 +37,8 @@ export default function App() {
   const closeFile = useWorkspace((s) => s.closeFile)
   const activeFileByProject = useWorkspace((s) => s.activeFileByProject)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useWindowZoom()
 
   // Toggle the Home terminal dock. Opening with no Home terminals starts one by
   // default so you always land in a live shell.

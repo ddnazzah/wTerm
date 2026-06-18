@@ -6,6 +6,7 @@ import type {
   WorkflowRunSummary,
   WorkflowSummary,
 } from '@shared/types'
+import { CollapsibleSection } from './collapsible-section'
 
 interface Props {
   project: Project
@@ -68,38 +69,40 @@ export function RunsSection({ project, gitInfo }: Props) {
   }
 
   return (
-    <section>
-      <div className="px-3 py-2 flex items-center gap-2">
-        <h3 className="text-[11px] uppercase tracking-wider text-foreground/45 font-medium flex-1">
-          CI / Workflow Runs
-        </h3>
-        {gitInfo?.branch && (
-          <label className="flex items-center gap-1 text-[10px] text-foreground/60">
-            <input
-              type="checkbox"
-              checked={filterMine}
-              onChange={(e) => setFilterMine(e.target.checked)}
-            />
-            this branch
-          </label>
-        )}
-        <button
-          type="button"
-          onClick={() => setDispatching(true)}
-          title="Trigger a workflow"
-          className="text-[11px] px-2 py-0.5 rounded-md bg-foreground/10 hover:bg-foreground/20 text-foreground/85"
-        >
-          ▶ Run
-        </button>
-        <button
-          type="button"
-          onClick={() => void reload()}
-          title="Refresh"
-          className="text-[11px] text-foreground/55 hover:text-foreground"
-        >
-          ↻
-        </button>
-      </div>
+    <CollapsibleSection
+      title="CI / Workflow Runs"
+      count={loading ? undefined : runs.length}
+      actions={
+        <>
+          {gitInfo?.branch && (
+            <label className="flex items-center gap-1 text-[10px] text-foreground/60">
+              <input
+                type="checkbox"
+                checked={filterMine}
+                onChange={(e) => setFilterMine(e.target.checked)}
+              />
+              this branch
+            </label>
+          )}
+          <button
+            type="button"
+            onClick={() => setDispatching(true)}
+            title="Trigger a workflow"
+            className="text-[11px] px-2 py-0.5 rounded-md bg-foreground/10 hover:bg-foreground/20 text-foreground/85"
+          >
+            ▶ Run
+          </button>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            title="Refresh"
+            className="text-[11px] text-foreground/55 hover:text-foreground"
+          >
+            ↻
+          </button>
+        </>
+      }
+    >
       {loading && <div className="text-[11px] text-foreground/40 px-3 py-2">Loading…</div>}
       {error && <div className="text-[11px] text-red-400 px-3 py-2">{error}</div>}
       {!loading && runs.length === 0 && !error && (
@@ -129,7 +132,7 @@ export function RunsSection({ project, gitInfo }: Props) {
           </li>
         ))}
       </ul>
-    </section>
+    </CollapsibleSection>
   )
 }
 

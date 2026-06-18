@@ -100,6 +100,7 @@ export const IPC = {
     focusTerminal: 'system:focus-terminal',
     openExternal: 'system:open-external',
     version: 'system:version',
+    setZoom: 'system:set-zoom',
   },
   update: {
     check: 'update:check',

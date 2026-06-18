@@ -84,6 +84,8 @@ const api = {
       ipcRenderer.invoke(IPC.system.notify, payload),
     openExternal: (url: string): Promise<void> =>
       ipcRenderer.invoke(IPC.system.openExternal, url),
+    setZoom: (factor: number): Promise<number> =>
+      ipcRenderer.invoke(IPC.system.setZoom, factor),
     onFocusTerminal: (cb: (payload: FocusTerminalPayload) => void): (() => void) => {
       const listener = (_: unknown, payload: FocusTerminalPayload) => cb(payload)
       ipcRenderer.on(IPC.system.focusTerminal, listener)

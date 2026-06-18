@@ -38,8 +38,8 @@ export function TopBar({
 
   return (
     <header
-      className={`app-titlebar relative flex items-center h-11 px-3 gap-2 flex-shrink-0 ${
-        isMac ? 'pl-20' : ''
+      className={`app-titlebar relative flex items-center h-11 pr-3 gap-2 flex-shrink-0 ${
+        isMac ? 'pl-20' : 'pl-1.5'
       } ${isWindows ? 'pr-[100px]' : ''}`}
     >
       <button

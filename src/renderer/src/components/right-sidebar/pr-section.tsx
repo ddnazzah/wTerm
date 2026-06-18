@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { GitInfo, Project, PullRequestDetail, PullRequestSummary } from '@shared/types'
+import { CollapsibleSection } from './collapsible-section'
 
 interface Props {
   project: Project
@@ -66,29 +67,31 @@ export function PrSection({ project, gitInfo, onRequestPush, pushing }: Props) {
   }
 
   return (
-    <section className="border-b border-accent/7">
-      <div className="px-3 py-2 flex items-center gap-2">
-        <h3 className="text-[11px] uppercase tracking-wider text-foreground/45 font-medium flex-1">
-          Pull Requests
-        </h3>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as Filter)}
-          className="text-[11px] bg-foreground/5 text-foreground/80 px-1.5 py-0.5 rounded outline-none"
-        >
-          <option value="open">Open</option>
-          <option value="closed">Closed</option>
-          <option value="all">All</option>
-        </select>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          title="Create PR from current branch"
-          className="text-[11px] px-2 py-0.5 rounded-md bg-foreground/10 hover:bg-foreground/20 text-foreground/85"
-        >
-          + New
-        </button>
-      </div>
+    <CollapsibleSection
+      title="Pull Requests"
+      count={loading ? undefined : prs.length}
+      actions={
+        <>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as Filter)}
+            className="text-[11px] bg-foreground/5 text-foreground/80 px-1.5 py-0.5 rounded outline-none"
+          >
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+            <option value="all">All</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            title="Create PR from current branch"
+            className="text-[11px] px-2 py-0.5 rounded-md bg-foreground/10 hover:bg-foreground/20 text-foreground/85"
+          >
+            + New
+          </button>
+        </>
+      }
+    >
       {loading && (
         <div className="text-[11px] text-foreground/40 px-3 py-2">Loading…</div>
       )}
@@ -122,7 +125,7 @@ export function PrSection({ project, gitInfo, onRequestPush, pushing }: Props) {
           </li>
         ))}
       </ul>
-    </section>
+    </CollapsibleSection>
   )
 }
 
