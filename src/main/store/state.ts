@@ -71,6 +71,30 @@ export function getState(): AppState {
   return cache
 }
 
+/**
+ * Listeners fired after every state mutation. The mobile bridge subscribes to
+ * push the new full state to connected phone clients, so desktop-originated
+ * changes (a terminal created at the desktop) reach the phone too. Kept separate
+ * from the renderer's `state:changed` channel, which only carries
+ * bridge-originated changes to avoid clobbering the desktop's optimistic updates.
+ */
+const changeListeners = new Set<() => void>()
+
+export function onStateChange(listener: () => void): () => void {
+  changeListeners.add(listener)
+  return () => changeListeners.delete(listener)
+}
+
+function notifyStateChange(): void {
+  for (const listener of changeListeners) {
+    try {
+      listener()
+    } catch (err) {
+      console.error('[state] change listener failed:', err)
+    }
+  }
+}
+
 export function getProject(id: ProjectId): Project | undefined {
   return cache.projects.find((p) => p.id === id)
 }
@@ -78,11 +102,13 @@ export function getProject(id: ProjectId): Project | undefined {
 export function setState(next: AppState): void {
   cache = next
   scheduleSave()
+  notifyStateChange()
 }
 
 export function mutate(fn: (draft: AppState) => void): AppState {
   fn(cache)
   scheduleSave()
+  notifyStateChange()
   return cache
 }
 

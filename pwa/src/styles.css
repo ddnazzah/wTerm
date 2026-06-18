@@ -1,0 +1,220 @@
+@import '@xterm/xterm/css/xterm.css';
+
+:root {
+  --bg: #0b0b0f;
+  --bg-elev: #14141b;
+  --bg-elev-2: #1c1c26;
+  --border: #2a2a38;
+  --fg: #e5e7eb;
+  --fg-dim: #9aa0ac;
+  --accent: #5ccfe6;
+  --accent-2: #7c3aed;
+  --danger: #ef4444;
+  --ok: #10b981;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  overscroll-behavior: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* ---- top bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(env(safe-area-inset-top), 8px) 10px 8px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+}
+.topbar select {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 15px;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  flex: none;
+}
+.dot.online {
+  background: var(--ok);
+}
+.dot.offline {
+  background: var(--danger);
+}
+.iconbtn {
+  flex: none;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 15px;
+}
+
+/* ---- terminal tabs ---- */
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 10px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.tab.active {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.tab .unread {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.tab.add {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---- terminal area ---- */
+.term-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: #000;
+}
+.term-wrap .xterm {
+  height: 100%;
+  padding: 6px 8px;
+}
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--fg-dim);
+  font-size: 15px;
+  text-align: center;
+  padding: 24px;
+}
+
+/* ---- key toolbar ---- */
+.keys {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 10px calc(max(env(safe-area-inset-bottom), 8px));
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.keys::-webkit-scrollbar {
+  display: none;
+}
+.key {
+  flex: none;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: ui-monospace, monospace;
+  min-width: 42px;
+}
+.key:active,
+.key.sticky-on {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+/* ---- pairing / message screens ---- */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}
+.center h1 {
+  font-size: 22px;
+  margin: 0;
+}
+.center p {
+  color: var(--fg-dim);
+  margin: 0;
+  max-width: 320px;
+  line-height: 1.5;
+}
+.code-input {
+  font-size: 28px;
+  letter-spacing: 8px;
+  text-align: center;
+  width: 220px;
+  padding: 12px;
+  background: var(--bg-elev-2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.btn {
+  background: var(--accent);
+  color: #00222b;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.err {
+  color: var(--danger);
+  font-size: 14px;
+  min-height: 18px;
+}

@@ -22,62 +22,92 @@ function resolveCwd(root: string, rel: string | undefined): string {
   return abs
 }
 
+/**
+ * Create a terminal + its PTY. The authoritative `TerminalRecord` (and its id)
+ * is born here in main, so both the desktop IPC handler and the mobile bridge
+ * call this and receive the same canonical record. Returns null if the target
+ * project doesn't exist.
+ */
+export function createTerminal(
+  pty: PtyManager,
+  opts: CreateTerminalOptions
+): TerminalRecord | null {
+  const project = getProject(opts.projectId)
+  if (!project) return null
+
+  const shell = opts.shell ?? getDefaultShell()
+  const cwd = resolveCwd(project.path, opts.cwd)
+
+  // Restore path: rebuild a persisted Claude tab, reusing its id so the
+  // recreated PTY lines up with the existing record and active-tab state.
+  if (opts.id && opts.resumeSessionId) {
+    const existing = project.terminals.find((t) => t.id === opts.id)
+    const record: TerminalRecord = {
+      id: opts.id,
+      name: existing?.name ?? opts.name ?? `Terminal ${project.terminals.length + 1}`,
+      shell: existing?.shell ?? shell,
+      claudeSessionId: opts.resumeSessionId,
+    }
+    upsertTerminal(project.id, record)
+    pty.create({
+      id: opts.id,
+      cwd,
+      shell: record.shell,
+      startupCommand: buildResumeCommand(opts.startupCommand, opts.resumeSessionId),
+    })
+    return record
+  }
+
+  // New tab. When it launches Claude, generate and pin a session id so the
+  // transcript is ours to resume after a restart (see pty/claude-session.ts).
+  // We only claim ownership when we actually injected the id — if the user's
+  // command already pins a session, withSessionId leaves it untouched and we
+  // must not record an id we don't control.
+  const id = randomUUID()
+  let claudeSessionId: string | undefined
+  let startupCommand = opts.startupCommand
+  if (isClaudeLaunch(opts.startupCommand) && opts.startupCommand) {
+    const candidate = randomUUID()
+    const injected = withSessionId(opts.startupCommand, candidate)
+    if (injected !== opts.startupCommand) {
+      claudeSessionId = candidate
+      startupCommand = injected
+    }
+  }
+  const record: TerminalRecord = {
+    id,
+    name: opts.name ?? `Terminal ${project.terminals.length + 1}`,
+    shell,
+    ...(claudeSessionId ? { claudeSessionId } : {}),
+  }
+  upsertTerminal(project.id, record)
+  pty.create({ id, cwd, shell, startupCommand })
+  return record
+}
+
+export function renameTerminal(projectId: ProjectId, id: TerminalId, name: string): void {
+  const project = getProject(projectId)
+  const t = project?.terminals.find((x) => x.id === id)
+  if (project && t) upsertTerminal(project.id, { ...t, name })
+}
+
+export function removeTerminalRecord(pty: PtyManager, projectId: ProjectId, id: TerminalId): void {
+  // Removing the record is permanent (the terminal won't be restored), so kill
+  // its pty as well rather than leaving the shell running orphaned.
+  pty.kill(id)
+  removeTerminal(projectId, id)
+}
+
+export function setActiveTerminal(projectId: ProjectId, id: TerminalId | null): void {
+  mutate((s) => {
+    s.activeTerminalByProject = { ...(s.activeTerminalByProject ?? {}), [projectId]: id }
+  })
+}
+
 export function registerTerminalIpc(pty: PtyManager): void {
   ipcMain.handle(
     IPC.terminals.create,
-    (_e, opts: CreateTerminalOptions): TerminalRecord | null => {
-      const project = getProject(opts.projectId)
-      if (!project) return null
-
-      const shell = opts.shell ?? getDefaultShell()
-      const cwd = resolveCwd(project.path, opts.cwd)
-
-      // Restore path: rebuild a persisted Claude tab, reusing its id so the
-      // recreated PTY lines up with the existing record and active-tab state.
-      if (opts.id && opts.resumeSessionId) {
-        const existing = project.terminals.find((t) => t.id === opts.id)
-        const record: TerminalRecord = {
-          id: opts.id,
-          name: existing?.name ?? opts.name ?? `Terminal ${project.terminals.length + 1}`,
-          shell: existing?.shell ?? shell,
-          claudeSessionId: opts.resumeSessionId,
-        }
-        upsertTerminal(project.id, record)
-        pty.create({
-          id: opts.id,
-          cwd,
-          shell: record.shell,
-          startupCommand: buildResumeCommand(opts.startupCommand, opts.resumeSessionId),
-        })
-        return record
-      }
-
-      // New tab. When it launches Claude, generate and pin a session id so the
-      // transcript is ours to resume after a restart (see pty/claude-session.ts).
-      // We only claim ownership when we actually injected the id — if the user's
-      // command already pins a session, withSessionId leaves it untouched and we
-      // must not record an id we don't control.
-      const id = randomUUID()
-      let claudeSessionId: string | undefined
-      let startupCommand = opts.startupCommand
-      if (isClaudeLaunch(opts.startupCommand) && opts.startupCommand) {
-        const candidate = randomUUID()
-        const injected = withSessionId(opts.startupCommand, candidate)
-        if (injected !== opts.startupCommand) {
-          claudeSessionId = candidate
-          startupCommand = injected
-        }
-      }
-      const record: TerminalRecord = {
-        id,
-        name: opts.name ?? `Terminal ${project.terminals.length + 1}`,
-        shell,
-        ...(claudeSessionId ? { claudeSessionId } : {}),
-      }
-      upsertTerminal(project.id, record)
-      pty.create({ id, cwd, shell, startupCommand })
-      return record
-    }
+    (_e, opts: CreateTerminalOptions): TerminalRecord | null => createTerminal(pty, opts)
   )
 
   ipcMain.handle(IPC.terminals.attach, (_e, id: string): string => {
@@ -99,22 +129,15 @@ export function registerTerminalIpc(pty: PtyManager): void {
   ipcMain.handle(
     IPC.terminals.rename,
     (_e, projectId: string, id: string, name: string): void => {
-      const project = getProject(projectId)
-      const t = project?.terminals.find((x) => x.id === id)
-      if (project && t) upsertTerminal(project.id, { ...t, name })
+      renameTerminal(projectId, id, name)
     }
   )
 
   ipcMain.on('terminals:remove-record', (_e, projectId: string, id: string) => {
-    // Removing the record is permanent (the terminal won't be restored), so kill
-    // its pty as well rather than leaving the shell running orphaned.
-    pty.kill(id)
-    removeTerminal(projectId, id)
+    removeTerminalRecord(pty, projectId, id)
   })
 
   ipcMain.on(IPC.terminals.setActive, (_e, projectId: ProjectId, id: TerminalId | null) => {
-    mutate((s) => {
-      s.activeTerminalByProject = { ...(s.activeTerminalByProject ?? {}), [projectId]: id }
-    })
+    setActiveTerminal(projectId, id)
   })
 }

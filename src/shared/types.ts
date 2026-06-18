@@ -102,6 +102,17 @@ export const IPC = {
     version: 'system:version',
     setZoom: 'system:set-zoom',
   },
+  /** Full-state push from main to renderer, fired after bridge-originated mutations. */
+  state: {
+    changed: 'state:changed',
+  },
+  /** Mobile-bridge control + reachability (see src/main/bridge). */
+  bridge: {
+    getStatus: 'bridge:get-status',
+    status: 'bridge:status',
+    getPairing: 'bridge:get-pairing',
+    regeneratePairing: 'bridge:regenerate-pairing',
+  },
   update: {
     check: 'update:check',
     install: 'update:install',
@@ -154,6 +165,59 @@ export interface NotifyPayload {
   projectId: ProjectId
   terminalId: TerminalId
 }
+
+// ---- Mobile bridge ----
+
+/** Reachability of the embedded mobile-bridge server, pushed to the renderer. */
+export interface BridgeStatus {
+  /** the local HTTP server is bound and listening */
+  listening: boolean
+  /** local port the HTTP server is bound to (127.0.0.1) */
+  port: number | null
+  /** number of connected phone clients */
+  clients: number
+  /**
+   * Best-effort public HTTPS origin to reach the bridge from a phone, derived
+   * from `tailscale status` (MagicDNS name). null when Tailscale isn't running
+   * or serve isn't configured.
+   */
+  tailscaleOrigin: string | null
+}
+
+/** Pairing material shown on the desktop so a phone can pair once. */
+export interface BridgePairing {
+  /** short human-typeable code (e.g. 6 digits) */
+  code: string
+  /** the long bearer token a paired phone stores and sends thereafter */
+  token: string
+  /** fully-formed URL (origin + token) encoded into the desktop QR image */
+  pairUrl: string | null
+}
+
+/**
+ * Messages the bridge server pushes to a connected phone client over the
+ * WebSocket. Mirrors the desktop's renderer data flow.
+ */
+export type BridgeServerMessage =
+  | { type: 'hello'; state: AppState }
+  | { type: 'attached'; id: TerminalId; snapshot: string }
+  | { type: 'data'; id: TerminalId; data: string }
+  | { type: 'exit'; id: TerminalId; exitCode: number; signal?: number }
+  | { type: 'state'; state: AppState }
+  | { type: 'error'; message: string }
+
+/** Messages a phone client sends up to the bridge server over the WebSocket. */
+export type BridgeClientMessage =
+  | { type: 'attach'; id: TerminalId }
+  | { type: 'detach'; id: TerminalId }
+  | { type: 'input'; id: TerminalId; data: string }
+  | { type: 'resize'; id: TerminalId; cols: number; rows: number }
+  | { type: 'create'; opts: CreateTerminalOptions }
+  | { type: 'kill'; projectId: ProjectId; id: TerminalId }
+  | { type: 'rename'; projectId: ProjectId; id: TerminalId; name: string }
+  | { type: 'setActive'; projectId: ProjectId; id: TerminalId | null }
+  | { type: 'selectProject'; projectId: ProjectId | null }
+  | { type: 'subscribePush'; subscription: unknown }
 
 export interface FocusTerminalPayload {
   projectId: ProjectId

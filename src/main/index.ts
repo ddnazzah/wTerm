@@ -9,8 +9,11 @@ import { registerDialogIpc } from './ipc/dialog'
 import { registerFsIpc } from './ipc/fs'
 import { registerGitIpc } from './ipc/git'
 import { registerGitHubIpc } from './ipc/github'
+import { registerBridgeIpc } from './ipc/bridge'
 import { loadState, saveStateNow } from './store/state'
+import { setSyncWindow } from './sync'
 import { PtyManager } from './pty/manager'
+import { MobileBridge } from './bridge/server'
 import {
   isUpdateReady,
   quitAndInstallUpdate,
@@ -49,6 +52,7 @@ if (APP_ICON_PATH && process.platform === 'darwin') {
 
 let mainWindow: BrowserWindow | null = null
 const ptyManager = new PtyManager()
+const mobileBridge = new MobileBridge(ptyManager)
 // Set once we begin tearing down — either a normal quit or an update install —
 // so the `before-quit` handler runs its async save exactly once.
 let isQuitting = false
@@ -94,6 +98,7 @@ function createWindow(): void {
 
   ptyManager.attachWindow(mainWindow)
   setMainWindow(mainWindow)
+  setSyncWindow(mainWindow)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -116,6 +121,14 @@ app.whenReady().then(async () => {
   createWindow()
   if (mainWindow) setUpdaterWindow(mainWindow)
   startUpdateChecks()
+
+  // Register the bridge IPC up front so the Settings pane can always query
+  // status/pairing (getStatus reports listening:false until start() resolves).
+  if (mainWindow) registerBridgeIpc(mobileBridge, mainWindow)
+
+  // Start the mobile bridge. A bind failure (e.g. port in use) must not take the
+  // app down — the desktop keeps working without the phone feature.
+  mobileBridge.start().catch((err) => console.error('[bridge] failed to start:', err))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

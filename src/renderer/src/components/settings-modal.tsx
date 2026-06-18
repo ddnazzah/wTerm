@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { useSettings, DEFAULTS } from '@renderer/state/settings'
 import { useUpdates } from '@renderer/state/updates'
 import { kbd } from '@renderer/lib/platform'
+import type { BridgePairing, BridgeStatus } from '@shared/types'
 
 interface Props {
   open: boolean
   onClose: () => void
 }
 
-type CategoryId = 'appearance' | 'terminal' | 'editor' | 'formatting' | 'updates' | 'about'
+type CategoryId =
+  | 'appearance'
+  | 'terminal'
+  | 'editor'
+  | 'formatting'
+  | 'mobile'
+  | 'updates'
+  | 'about'
 
 const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'editor', label: 'Editor' },
   { id: 'formatting', label: 'Formatting' },
+  { id: 'mobile', label: 'Mobile' },
   { id: 'updates', label: 'Updates' },
   { id: 'about', label: 'About' },
 ]
@@ -91,6 +101,7 @@ export function SettingsModal({ open, onClose }: Props) {
             {active === 'terminal' && <TerminalPane />}
             {active === 'editor' && <EditorPane />}
             {active === 'formatting' && <FormattingPane />}
+            {active === 'mobile' && <MobilePane />}
             {active === 'updates' && <UpdatesPane />}
             {active === 'about' && <AboutPane />}
           </div>
@@ -180,6 +191,123 @@ function FormattingPane() {
         <kbd className="px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/80 text-[11px]">{kbd('F', { shift: true })}</kbd>{' '}
         to format the active file on demand.
       </Hint>
+    </Pane>
+  )
+}
+
+function MobilePane() {
+  const [pairing, setPairing] = useState<BridgePairing | null>(null)
+  const [status, setStatus] = useState<BridgeStatus | null>(null)
+  const [qr, setQr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.api.bridge.getPairing().then((p) => alive && setPairing(p))
+    void window.api.bridge.getStatus().then((s) => alive && setStatus(s))
+    const off = window.api.bridge.onStatus((s) => alive && setStatus(s))
+    return () => {
+      alive = false
+      off()
+    }
+  }, [])
+
+  // Render the QR from the pair URL (origin + code) whenever it changes.
+  useEffect(() => {
+    if (!pairing?.pairUrl) {
+      setQr(null)
+      return
+    }
+    void QRCode.toDataURL(pairing.pairUrl, { margin: 1, width: 220 })
+      .then(setQr)
+      .catch(() => setQr(null))
+  }, [pairing?.pairUrl])
+
+  const regenerate = async (): Promise<void> => {
+    setPairing(await window.api.bridge.regeneratePairing())
+  }
+
+  const origin = status?.tailscaleOrigin ?? null
+
+  return (
+    <Pane>
+      <Hint>
+        Continue working in your terminals from your phone. Pair once, then open the wTerm web app
+        on your phone over your private Tailscale network.
+      </Hint>
+      <Divider />
+
+      {/* Connection status */}
+      <div className="flex items-center gap-3">
+        <label className="text-[13px] text-foreground/80 flex-1">Bridge</label>
+        <span className="flex items-center gap-2 text-[12px] text-foreground/60">
+          <span
+            className={[
+              'inline-block h-2 w-2 rounded-full',
+              status?.listening ? 'bg-emerald-400' : 'bg-foreground/30',
+            ].join(' ')}
+          />
+          {status?.listening ? `listening · ${status.clients} phone${status.clients === 1 ? '' : 's'}` : 'off'}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-[13px] text-foreground/80 flex-1">Phone address</label>
+        <span className="text-[12px] text-foreground/60 font-mono truncate max-w-[60%]">
+          {origin ?? 'Tailscale not detected'}
+        </span>
+      </div>
+
+      <Divider />
+
+      {/* Pairing */}
+      <div className="flex gap-6 items-start">
+        <div className="flex flex-col gap-3 flex-1 min-w-0">
+          <label className="text-[13px] text-foreground/80">Pairing code</label>
+          <div className="font-mono text-3xl tracking-[0.3em] tabular-nums text-foreground">
+            {pairing?.code ?? '······'}
+          </div>
+          <p className="text-[12px] leading-relaxed text-foreground/55">
+            On your phone, open{' '}
+            <span className="font-mono text-foreground/80">{origin ?? 'your Tailscale address'}</span>{' '}
+            and enter this code, or scan the QR.
+          </p>
+          <button
+            type="button"
+            onClick={() => void regenerate()}
+            className="self-start rounded-md bg-foreground/5 px-3 py-1.5 text-[12px] text-foreground/80 hover:bg-foreground/10"
+          >
+            Regenerate code
+          </button>
+        </div>
+        {qr && (
+          <img
+            src={qr}
+            alt="Pairing QR code"
+            width={120}
+            height={120}
+            className="rounded-lg border border-foreground/15 bg-white p-1"
+          />
+        )}
+      </div>
+
+      {!origin && (
+        <>
+          <Divider />
+          <div className="space-y-2">
+            <label className="text-[13px] text-foreground/80">Set up Tailscale</label>
+            <p className="text-[12px] leading-relaxed text-foreground/55">
+              Install Tailscale on this computer and your phone, then expose the bridge over HTTPS by
+              running this once in a terminal:
+            </p>
+            <code className="block rounded-md bg-foreground/5 px-3 py-2 text-[12px] font-mono text-foreground/80">
+              tailscale serve --bg {status?.port ?? 8788}
+            </code>
+            <p className="text-[12px] leading-relaxed text-foreground/55">
+              HTTPS is required for the phone app's notifications and install-to-home-screen.
+            </p>
+          </div>
+        </>
+      )}
     </Pane>
   )
 }

@@ -21,6 +21,16 @@ A project sidebar on the left, real terminals (and a file editor) in the center,
 - **Single Halcyon theme.** One hand-tuned deep-navy palette across the app chrome, terminal, and editor. Font stack leads with the bundled `MesloLGS NF` so Powerlevel10k powerline glyphs render correctly.
 - **Native escape hatch.** Per-project "Open in Terminal" / "Open in file manager" — iTerm on macOS, Windows Terminal on Windows — for when you want a standalone terminal window or to poke at the filesystem.
 - **Auto-update.** The installed app checks GitHub Releases on launch (and hourly), downloads new versions in the background, and shows a "Restart to update" banner — otherwise the update installs on next quit. macOS updates are delivered through the signed + notarized build; there's also a manual "Check for updates" in Settings.
+- **Work from your phone.** wTerm runs a small local web server and serves a mobile web app (PWA) that attaches to your live terminals — read output, type and run commands, and create / kill / rename terminals or switch projects, all kept in sync with the desktop. Reach it from anywhere over a private [Tailscale](https://tailscale.com) network (no public exposure, no port forwarding). Pair once with a 6-digit code or QR shown in **Settings → Mobile**. When a backgrounded terminal needs attention, you get a Web Push notification on your phone.
+
+## Work from your phone
+
+1. Install Tailscale on this computer and your phone (same tailnet).
+2. Expose the bridge over HTTPS — once, from a terminal: `tailscale serve --bg 8788`. HTTPS is required so the phone app can register a service worker, install to the home screen, and receive push notifications.
+3. On your phone, open the address shown in **Settings → Mobile** (e.g. `https://your-mac.your-tailnet.ts.net`) and enter the 6-digit pairing code (or scan the QR). The pairing token is stored on the phone so you only do this once.
+4. Optionally tap **⋯ → Enable notifications** in the phone app (on iOS, add it to your Home Screen first).
+
+The desktop owns the PTYs, so the phone is a live view onto the same terminals — anything you start on your phone keeps running when you're back at your desk, and vice-versa. PTYs still don't survive an app restart (only Claude tabs are restored), same as on the desktop.
 
 ## Stack
 
@@ -43,9 +53,11 @@ No separate backend process. The Electron main process handles PTY lifecycle, pr
 src/
 ├── main/                          Electron main process (Node)
 │   ├── index.ts                   Window + app lifecycle
-│   ├── ipc/                       IPC handlers: projects, terminals, system, dialog, fs, git, github
+│   ├── ipc/                       IPC handlers: projects, terminals, system, dialog, fs, git, github, bridge
 │   ├── pty/                       node-pty lifecycle, output coalescing, shell integration
+│   ├── bridge/                    Mobile bridge: HTTP+WS server, client fan-out, pairing/VAPID (safeStorage), web-push, tailscale
 │   ├── github/                    Device-flow auth (safeStorage) + REST client
+│   ├── sync.ts                    Pushes state to the desktop renderer after phone-initiated changes
 │   └── store/state.ts             Debounced atomic JSON persistence
 ├── preload/index.ts               contextBridge — exposes typed window.api
 ├── renderer/                      React app
@@ -58,6 +70,9 @@ src/
 │       ├── lib/theme.ts               Halcyon theme + CodeMirror theme
 │       └── state/                     Zustand stores (workspace + settings)
 └── shared/types.ts                Shared types + IPC channel names
+
+pwa/                               Mobile web app (PWA), served by src/main/bridge — xterm.js + WS client,
+                                   service worker for Web Push. Built to out/pwa via `pnpm build:pwa`.
 ```
 
 State lives at `state.json` in Electron's `userData` dir — `~/Library/Application Support/wTerm/` on macOS, `%APPDATA%/wTerm/` on Windows. Writes are debounced (500ms) and atomic (tmp + rename); `before-quit` flushes any pending save before `app.exit()`. Editor and terminal settings (including the startup command) live in renderer `localStorage`; GitHub tokens are encrypted via Electron `safeStorage`.

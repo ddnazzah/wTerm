@@ -13,6 +13,19 @@ function pickColor(index: number): string {
   return PALETTE[index % PALETTE.length] ?? '#7c3aed'
 }
 
+/**
+ * Set the selected project. Authoritative selection lives in main state; the
+ * renderer mirrors it optimistically and rehydrates from `state:changed`. Used
+ * by both the IPC handler and the mobile bridge.
+ */
+export function selectProject(id: ProjectId | null): void {
+  mutate((s) => {
+    if (id === null || s.projects.some((p) => p.id === id)) {
+      s.selectedProjectId = id
+    }
+  })
+}
+
 export function registerProjectIpc(): void {
   ipcMain.handle(IPC.projects.snapshot, (): AppState => getState())
 
@@ -52,6 +65,10 @@ export function registerProjectIpc(): void {
       const project = s.projects.find((p) => p.id === id)
       if (project) project.name = name
     })
+  })
+
+  ipcMain.handle(IPC.projects.select, (_e, id: ProjectId | null): void => {
+    selectProject(id)
   })
 
   ipcMain.handle(IPC.projects.reorder, (_e, orderedIds: ProjectId[]): void => {

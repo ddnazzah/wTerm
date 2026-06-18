@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import { IPC, type FocusTerminalPayload, type NotifyPayload, type ProjectId } from '@shared/types'
 import { getProject } from '../store/state'
+import { pushToSubscribers } from '../bridge/push'
 
 let mainWindowRef: BrowserWindow | null = null
 
@@ -85,6 +86,12 @@ export function registerSystemIpc(): void {
   })
 
   ipcMain.handle(IPC.system.notify, (_e, payload: NotifyPayload): void => {
+    // Mirror every attention notification to paired phones over Web Push. This
+    // handler only fires when the user isn't actively viewing the terminal (the
+    // renderer suppresses the visible+focused case), so a push here means the
+    // user genuinely needs to be told — on whatever device they're near.
+    void pushToSubscribers(payload)
+
     if (process.platform === 'darwin' && !app.isPackaged) {
       notifyViaOsascript(payload.title, payload.body)
       return

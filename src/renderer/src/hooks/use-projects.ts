@@ -53,6 +53,19 @@ export function useProjects() {
     }
   }, [setProjects])
 
+  // The mobile bridge mutates authoritative state in main on the phone's behalf
+  // (create/kill/rename a terminal, switch project). Main pushes the full state
+  // here so the desktop UI reconciles. setProjects is an idempotent merge, so
+  // re-applying the snapshot is safe; PTY data still arrives via terminals.onData.
+  useEffect(() => {
+    return window.api.state.onChanged((state) => {
+      setProjects(state.projects, {
+        selectedProjectId: state.selectedProjectId,
+        activeTerminalByProject: state.activeTerminalByProject ?? {},
+      })
+    })
+  }, [setProjects])
+
   const addProject = useCallback(async (): Promise<void> => {
     const folder = await window.api.dialog.pickFolder()
     if (!folder) return

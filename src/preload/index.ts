@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import {
   IPC,
   type AppState,
+  type BridgePairing,
+  type BridgeStatus,
   type CreatePullRequestInput,
   type CreateTerminalOptions,
   type DeviceFlowPoll,
@@ -77,6 +79,26 @@ const api = {
   dialog: {
     pickFolder: (): Promise<string | null> =>
       ipcRenderer.invoke(IPC.dialog.pickFolder),
+  },
+  state: {
+    // Full-state push from main, fired after the mobile bridge mutates state on
+    // the phone's behalf. The renderer reconciles its Zustand mirror from this.
+    onChanged: (cb: (state: AppState) => void): (() => void) => {
+      const listener = (_: unknown, state: AppState) => cb(state)
+      ipcRenderer.on(IPC.state.changed, listener)
+      return () => ipcRenderer.off(IPC.state.changed, listener)
+    },
+  },
+  bridge: {
+    getStatus: (): Promise<BridgeStatus> => ipcRenderer.invoke(IPC.bridge.getStatus),
+    getPairing: (): Promise<BridgePairing> => ipcRenderer.invoke(IPC.bridge.getPairing),
+    regeneratePairing: (): Promise<BridgePairing> =>
+      ipcRenderer.invoke(IPC.bridge.regeneratePairing),
+    onStatus: (cb: (status: BridgeStatus) => void): (() => void) => {
+      const listener = (_: unknown, status: BridgeStatus) => cb(status)
+      ipcRenderer.on(IPC.bridge.status, listener)
+      return () => ipcRenderer.off(IPC.bridge.status, listener)
+    },
   },
   system: {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC.system.version),

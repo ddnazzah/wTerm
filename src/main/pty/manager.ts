@@ -17,15 +17,50 @@ interface PtyEntry {
   startupCommand: string | null
 }
 
+/**
+ * Additional consumers of PTY lifecycle events beyond the desktop renderer
+ * window (which is always fed via `webContents.send`). The mobile bridge
+ * registers one sink to receive the same data/exit/create stream and fans it
+ * out to connected phone clients. Sinks see every terminal; filtering by who
+ * cares about which terminal is the sink's responsibility.
+ */
+export interface PtySink {
+  onData?(p: TerminalDataPayload): void
+  onExit?(p: TerminalExitPayload): void
+  onCreate?(id: TerminalId): void
+}
+
 export class PtyManager {
   private window: BrowserWindow | null = null
   private entries = new Map<TerminalId, PtyEntry>()
+  private sinks = new Set<PtySink>()
 
   attachWindow(win: BrowserWindow): void {
     this.window = win
     win.on('closed', () => {
       this.window = null
     })
+  }
+
+  /** Register an extra consumer of PTY events. Returns an unsubscribe function. */
+  addSink(sink: PtySink): () => void {
+    this.sinks.add(sink)
+    return () => this.sinks.delete(sink)
+  }
+
+  /** Ids of all currently-live PTYs (used by the bridge to seed clients). */
+  liveIds(): TerminalId[] {
+    return [...this.entries.keys()]
+  }
+
+  private emitData(payload: TerminalDataPayload): void {
+    this.window?.webContents.send(IPC.terminals.data, payload)
+    for (const sink of this.sinks) sink.onData?.(payload)
+  }
+
+  private emitExit(payload: TerminalExitPayload): void {
+    this.window?.webContents.send(IPC.terminals.exit, payload)
+    for (const sink of this.sinks) sink.onExit?.(payload)
   }
 
   create(opts: {
@@ -86,6 +121,7 @@ export class PtyManager {
       startupCommand,
     }
     this.entries.set(opts.id, entry)
+    for (const sink of this.sinks) sink.onCreate?.(opts.id)
 
     pty.onData((data) => {
       entry.pendingData.push(data)
@@ -116,7 +152,7 @@ export class PtyManager {
       this.flush(entry)
       this.entries.delete(opts.id)
       const payload: TerminalExitPayload = { id: opts.id, exitCode, signal }
-      this.window?.webContents.send(IPC.terminals.exit, payload)
+      this.emitExit(payload)
     })
   }
 
@@ -165,6 +201,22 @@ export class PtyManager {
     return entry.buffer.join('')
   }
 
+  /**
+   * Snapshot for a newly-attaching mobile-bridge client. Unlike {@link attach}
+   * (which clears pending data to dedup for the sole desktop renderer), this
+   * first flushes any pending bytes to all *current* consumers, then returns the
+   * full buffer. The caller MUST add the client to its subscription set only
+   * after this returns synchronously — that way the flushed bytes reach existing
+   * consumers (not the new client) and every byte after the snapshot arrives via
+   * the live sink exactly once, with no gap and no duplication.
+   */
+  snapshotForBridge(id: TerminalId): string {
+    const entry = this.entries.get(id)
+    if (!entry) return ''
+    this.flush(entry)
+    return entry.buffer.join('')
+  }
+
   // Called on app quit. Kills every pty (and the shell + child processes running
   // in it); terminals are recreated fresh from persisted state on next launch.
   disposeAll(): void {
@@ -187,6 +239,6 @@ export class PtyManager {
     const data = entry.pendingData.join('')
     entry.pendingData = []
     const payload: TerminalDataPayload = { id: entry.id, data }
-    this.window?.webContents.send(IPC.terminals.data, payload)
+    this.emitData(payload)
   }
 }
