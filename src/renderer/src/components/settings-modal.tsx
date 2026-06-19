@@ -55,6 +55,7 @@ export function SettingsModal({ open, onClose }: Props) {
 
         <div className="px-8 py-7 space-y-10">
           <TerminalSection />
+          <AgentRestoreSection />
           <EditorSection />
           <FormattingSection />
           <UpdatesSection />
@@ -104,6 +105,53 @@ function TerminalSection() {
         Runs automatically in every new terminal tab once the shell is ready. Leave empty to
         disable (the default). Multiple lines run as separate commands.
       </p>
+    </Section>
+  )
+}
+
+function rulesToText(rules: { match: string; resume: string }[]): string {
+  return rules.map((r) => `${r.match} = ${r.resume}`).join('\n')
+}
+function parseRules(text: string): { match: string; resume: string }[] {
+  return text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => {
+      const i = l.indexOf('=')
+      if (i === -1) return null
+      return { match: l.slice(0, i).trim(), resume: l.slice(i + 1).trim() }
+    })
+    .filter((r): r is { match: string; resume: string } => !!r && !!r.match && !!r.resume)
+}
+
+function AgentRestoreSection() {
+  const agentRestore = useSettings((s) => s.agentRestore)
+  const update = useSettings((s) => s.updateAgentRestore)
+  const [text, setText] = useState(() => rulesToText(agentRestore.rules))
+
+  return (
+    <Section title="Agent restore">
+      <BoolField
+        label="Restore agent sessions on restart"
+        value={agentRestore.enabled}
+        onChange={(v) => update({ enabled: v })}
+      />
+      <p className="text-[12px] leading-relaxed text-foreground/55">
+        When you quit, wTerm remembers the agent running in each terminal and re-runs it in the same
+        folder on the next launch. Below maps a command to how it should resume — one{' '}
+        <code className="text-foreground/75">name = resume command</code> per line. Only listed
+        agents are restored.
+      </p>
+      <TextAreaField
+        label="Resume commands"
+        value={text}
+        placeholder={'claude = claude --continue\naider = aider'}
+        onChange={(v) => {
+          setText(v)
+          update({ rules: parseRules(v) })
+        }}
+      />
     </Section>
   )
 }

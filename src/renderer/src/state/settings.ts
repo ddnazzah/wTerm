@@ -35,8 +35,33 @@ export const TERMINAL_DEFAULTS: TerminalSettings = {
   startupCommand: '',
 }
 
+/** A rule mapping an agent command to how it should be relaunched on restart. */
+export interface AgentRestoreRule {
+  /** matched against the basename of the running command's first token */
+  match: string
+  /** the command run on restart to resume that agent in its folder */
+  resume: string
+}
+
+export interface AgentRestoreSettings {
+  /** Re-open agent terminals (claude, aider, ...) on restart, resumed. */
+  enabled: boolean
+  rules: AgentRestoreRule[]
+}
+
+export const AGENT_RESTORE_DEFAULTS: AgentRestoreSettings = {
+  enabled: true,
+  rules: [
+    { match: 'claude', resume: 'claude --continue' },
+    { match: 'cursor-agent', resume: 'cursor-agent --resume' },
+    { match: 'aider', resume: 'aider' },
+    { match: 'codex', resume: 'codex --continue' },
+  ],
+}
+
 const STORAGE_KEY = 'tw:editor-settings'
 const TERMINAL_STORAGE_KEY = 'tw:terminal-settings'
+const AGENT_RESTORE_STORAGE_KEY = 'tw:agent-restore-settings'
 
 function readStored(): EditorSettings {
   try {
@@ -76,17 +101,42 @@ function persistTerminal(s: TerminalSettings): void {
   }
 }
 
+function readStoredAgentRestore(): AgentRestoreSettings {
+  try {
+    const raw = localStorage.getItem(AGENT_RESTORE_STORAGE_KEY)
+    if (!raw) return AGENT_RESTORE_DEFAULTS
+    const parsed = JSON.parse(raw) as Partial<AgentRestoreSettings>
+    return {
+      enabled: parsed.enabled ?? AGENT_RESTORE_DEFAULTS.enabled,
+      rules: Array.isArray(parsed.rules) ? parsed.rules : AGENT_RESTORE_DEFAULTS.rules,
+    }
+  } catch {
+    return AGENT_RESTORE_DEFAULTS
+  }
+}
+
+function persistAgentRestore(s: AgentRestoreSettings): void {
+  try {
+    localStorage.setItem(AGENT_RESTORE_STORAGE_KEY, JSON.stringify(s))
+  } catch {
+    // ignore
+  }
+}
+
 interface SettingsState {
   editor: EditorSettings
   terminal: TerminalSettings
+  agentRestore: AgentRestoreSettings
   updateEditor: (patch: Partial<EditorSettings>) => void
   resetEditor: () => void
   updateTerminal: (patch: Partial<TerminalSettings>) => void
+  updateAgentRestore: (patch: Partial<AgentRestoreSettings>) => void
 }
 
 export const useSettings = create<SettingsState>((set) => ({
   editor: readStored(),
   terminal: readStoredTerminal(),
+  agentRestore: readStoredAgentRestore(),
   updateEditor: (patch) =>
     set((state) => {
       const next = { ...state.editor, ...patch }
@@ -103,5 +153,11 @@ export const useSettings = create<SettingsState>((set) => ({
       const next = { ...state.terminal, ...patch }
       persistTerminal(next)
       return { terminal: next }
+    }),
+  updateAgentRestore: (patch) =>
+    set((state) => {
+      const next = { ...state.agentRestore, ...patch }
+      persistAgentRestore(next)
+      return { agentRestore: next }
     }),
 }))

@@ -8,7 +8,7 @@ import {
   type TerminalId,
   type TerminalRecord,
 } from '@shared/types'
-import { getProject, mutate, removeTerminal, upsertTerminal } from '../store/state'
+import { getProject, getState, mutate, removeTerminal, upsertTerminal } from '../store/state'
 import { getDefaultShell } from '../pty/shell-integration'
 import { buildResumeCommand, isClaudeLaunch, withSessionId } from '../pty/claude-session'
 import type { PtyManager } from '../pty/manager'
@@ -117,4 +117,22 @@ export function registerTerminalIpc(pty: PtyManager): void {
       s.activeTerminalByProject = { ...(s.activeTerminalByProject ?? {}), [projectId]: id }
     })
   })
+
+  // Track the agent command running in each tab (from OSC 697 shell integration)
+  // so it can be re-launched on the next start. Fires on every command, so only
+  // persist when the value actually changes to avoid save churn.
+  ipcMain.on(
+    IPC.terminals.runningCommand,
+    (_e, id: TerminalId, agent: { command: string; cwd: string } | null) => {
+      for (const project of getState().projects) {
+        const t = project.terminals.find((x) => x.id === id)
+        if (!t) continue
+        const next = agent ?? undefined
+        if (JSON.stringify(t.agent) !== JSON.stringify(next)) {
+          upsertTerminal(project.id, { ...t, agent: next })
+        }
+        return
+      }
+    }
+  )
 }

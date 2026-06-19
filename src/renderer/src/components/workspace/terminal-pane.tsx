@@ -283,6 +283,34 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       return true
     })
 
+    // OSC 697;Cmd;<b64 command>;<b64 cwd> — emitted by wTerm's shell integration
+    // on every preexec. Tells main which agent command is running in this tab (and
+    // where), so a tab running `claude`/`aider`/etc. can be re-launched after a
+    // restart. The matching OSC 133;D (command finished) clears it.
+    const decodeB64 = (b64: string): string =>
+      new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)))
+    const osc697Disposable = term.parser.registerOscHandler(697, (data) => {
+      if (!data.startsWith('Cmd;')) return false
+      const parts = data.split(';')
+      try {
+        const command = decodeB64(parts[1] ?? '')
+        const cwd = decodeB64(parts[2] ?? '')
+        if (command.trim()) {
+          void window.api.terminals.setRunningCommand(terminalId, { command, cwd })
+        }
+      } catch {
+        // malformed base64 — ignore
+      }
+      return true
+    })
+    const osc133Disposable = term.parser.registerOscHandler(133, (data) => {
+      // `D` (command finished) means the tab is back at the prompt — no agent.
+      if (data[0] === 'D') {
+        void window.api.terminals.setRunningCommand(terminalId, null)
+      }
+      return false // leave the marker for any other consumer
+    })
+
     return () => {
       detached = true
       offData?.()
@@ -291,6 +319,8 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       titleDisposable.dispose()
       osc9Disposable.dispose()
       osc52Disposable.dispose()
+      osc697Disposable.dispose()
+      osc133Disposable.dispose()
       ro.disconnect()
       window.removeEventListener('resize', onResize)
       useWorkspace.getState().setTerminalBusy(terminalId, false)

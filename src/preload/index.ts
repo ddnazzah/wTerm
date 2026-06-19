@@ -63,6 +63,12 @@ const api = {
     setActive: (projectId: ProjectId, id: TerminalId | null): void => {
       ipcRenderer.send(IPC.terminals.setActive, projectId, id)
     },
+    setRunningCommand: (
+      id: TerminalId,
+      agent: { command: string; cwd: string } | null
+    ): void => {
+      ipcRenderer.send(IPC.terminals.runningCommand, id, agent)
+    },
     onData: (cb: (payload: TerminalDataPayload) => void): (() => void) => {
       const listener = (_: unknown, payload: TerminalDataPayload) => cb(payload)
       ipcRenderer.on(IPC.terminals.data, listener)
