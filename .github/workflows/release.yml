@@ -79,7 +79,7 @@ jobs:
         # --publish never: electron-builder only builds artifacts; the separate
         # "Publish release" job uploads them. Without this, electron-builder
         # tries to auto-publish on tag builds and fails on a missing GH_TOKEN.
-        run: pnpm run build:icons && pnpm exec electron-vite build && pnpm exec electron-builder --mac --publish never
+        run: pnpm run build:icons && pnpm exec electron-vite build && pnpm run build:pwa && pnpm exec electron-builder --mac --publish never
         env:
           # Bundling the Monaco editor blows past Node's default heap on the
           # 7 GB macOS runner (V8 FatalProcessOutOfMemory during electron-vite
@@ -96,7 +96,7 @@ jobs:
 
       - name: Build and package (Windows — unsigned)
         if: runner.os == 'Windows'
-        run: pnpm run build:icons && pnpm exec electron-vite build && pnpm exec electron-builder --win --publish never
+        run: pnpm run build:icons && pnpm exec electron-vite build && pnpm run build:pwa && pnpm exec electron-builder --win --publish never
         env:
           # Match the macOS build's heap bump — the Monaco bundle is the same
           # size on both platforms; keep them consistent so Windows can't OOM later.
