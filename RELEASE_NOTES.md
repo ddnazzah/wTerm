@@ -1,21 +1,22 @@
-# wTerm 0.2.0
+# wTerm 0.3.0
 
-A feature release for wTerm — a multi-project, multi-terminal workspace IDE. This build brings a full **Monaco-based code editor**, a **git-aware file tree**, **project reordering**, and **Claude session auto-resume** — close the app and your Claude conversations come back, already resumed.
+A feature release for wTerm — a multi-project, multi-terminal workspace IDE. This build adds a **phone companion** (drive your terminals from your phone over Tailscale), **agent session restore for any agent** (reopen `claude`/`cursor-agent`/`aider` tabs already resumed), plus window zoom, a redesigned settings panel, and a side-by-side docked editor.
 
 ## Downloads
 
-- **macOS (Apple Silicon)** — `wTerm-0.2.0-arm64.dmg`
-- **Windows (x64)** — `wTerm-0.2.0-x64-setup.exe`
+- **macOS (Apple Silicon)** — `wTerm-0.3.0-arm64.dmg`
+- **Windows (x64)** — `wTerm-0.3.0-x64-setup.exe`
 
-If you're on 0.1.3 or later, the app updates itself — you'll get 0.2.0 automatically.
+If you're on 0.1.3 or later, the app updates itself — you'll get 0.3.0 automatically.
 
-## What's changed in 0.2.0
+## What's changed in 0.3.0
 
-- **Claude session auto-resume** — terminal tabs that launched Claude are now remembered across restarts. On the next launch wTerm recreates each tab already resumed into its prior conversation (`claude --resume`), instead of an empty shell. Each tab tracks its own session, so multiple Claude tabs in one project all come back correctly. Bare-shell tabs remain session-scoped (not restored).
-- **Monaco editor** — the in-app editor is now powered by Monaco (the editor core from VS Code), replacing CodeMirror. Syntax highlighting across a wide language set, a Halcyon-matched theme tuned to the app, format-on-save, and offline-bundled language workers.
-- **View modes** — open files in a docked split, a floating panel, or full-screen, with a mode switcher in the editor chrome. Editor tabs support `⌘1`–`⌘9` jump and drag-to-reorder; `⌘W` closes the focused file tab.
-- **Git-aware file tree** — the right-sidebar file tree colors file names by git status and supports keyboard navigation, rename/delete/new-file, and type-ahead.
-- **Project reordering** — drag projects in the sidebar to reorder them; the order persists.
+- **Work from your phone.** wTerm runs a small local web server and serves a mobile web app (PWA) that attaches to your live terminals — read output, run commands, and create / kill / rename terminals or switch projects, all kept in sync with the desktop. Reach it from anywhere over a private [Tailscale](https://tailscale.com) network (no public exposure). Pair once with a 6-digit code / QR in **Settings → Mobile**, and get a Web Push notification when a backgrounded terminal needs attention. Optionally keep the Mac awake while a phone is connected.
+- **Agent session restore (any agent).** If a terminal was running an agent — `claude`, `cursor-agent`, `aider`, … — when you quit, wTerm reopens that tab on the next launch and re-runs the agent in the same folder so it resumes where you left off. It works for agents you type by hand, captured via shell integration, with an editable `name = resume command` map in **Settings → Terminal**. (Pinned Claude `--session-id` tabs still resume exactly as before.)
+- **Quieter, sharper agent status.** The "needs input" notification now fires only when an agent actually returns to the prompt — long tool runs no longer trip false alarms. The sidebar shows a glow only while an agent is working and a clear cue when it's waiting on you.
+- **Window zoom** — `⌘=` / `⌘-` / `⌘0` zoom the whole window; the factor persists.
+- **Redesigned settings** — a VS Code-style category rail (Appearance, Terminal, Editor, Formatting, Mobile, Updates, About).
+- **Side-by-side docked editor** and **collapsible Git / PR / Actions sections** in the right sidebar.
 
 ## macOS install instructions
 
@@ -33,40 +34,47 @@ The Windows installer is **unsigned**. SmartScreen will show "Windows protected 
 1. Click **More info**.
 2. Click **Run anyway**.
 
-The installer (`wTerm-0.2.0-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
+The installer (`wTerm-0.3.0-x64-setup.exe`) is a standard NSIS installer — pick an install location and it'll create Start Menu and desktop shortcuts.
+
+## Setting up the phone companion
+
+1. Install Tailscale on this Mac and your phone (same account).
+2. Expose the bridge over HTTPS once: `tailscale serve --bg 8788` (needs MagicDNS + HTTPS certificates enabled in the Tailscale admin console).
+3. On your phone, open the address shown in **Settings → Mobile** and enter the pairing code (or scan the QR).
+
+HTTPS is required so the phone app can register a service worker, install to the home screen, and receive push notifications.
 
 ## What's in this build
 
 See the [README](./README.md) for the full feature list. Highlights:
 
-- Claude session auto-resume across restarts (new in 0.2.0)
-- Monaco code editor with docked / floating / full-screen view modes (new in 0.2.0)
-- Git-aware file tree with keyboard navigation (new in 0.2.0)
-- Drag-to-reorder projects (new in 0.2.0)
+- Phone companion over Tailscale with Web Push (new in 0.3.0)
+- Agent session restore for any agent (new in 0.3.0)
+- Window zoom, redesigned settings, side-by-side docked editor (new in 0.3.0)
+- Monaco code editor with docked / floating / full-screen view modes
+- Git-aware file tree with keyboard navigation
+- Drag-to-reorder projects
 - Auto-update from GitHub Releases
 - Multi-project, multi-terminal workspace with persistent layout
 - Single hand-tuned Halcyon theme across app chrome, terminal, and editor
-- Configurable terminal startup command (runs in every new terminal tab)
-- Markdown preview (GitHub-flavored) for `.md` files
-- Background-bell notifications (Claude Code, aider, npm prompts wake you)
-- Built-in GitHub integration, settings panel
-- Powerlevel10k-friendly font stack
+- Built-in GitHub integration
 
 ## Known limitations
 
 - macOS: Apple Silicon only (no Intel build)
 - Windows: x64 only (no ARM build)
 - No Linux build
-- Session restore covers **Claude** tabs (resumed via `claude --resume`). Other long-running programs in bare shells still don't survive a restart. A Claude session typed manually into a bare shell (rather than launched via the configured startup command) isn't tracked and won't auto-resume.
+- The phone companion needs wTerm running on an awake Mac, plus Tailscale on both ends.
+- Agent restore only reopens tabs that had a mapped agent **running** at quit; a tab idling at a prompt restores nothing. Two agent tabs in the same folder resume that folder's latest conversation.
 
 ## Verifying the download (optional)
 
 ```bash
 # macOS / Linux
-shasum -a 256 wTerm-0.2.0-arm64.dmg
+shasum -a 256 wTerm-0.3.0-arm64.dmg
 
 # Windows (PowerShell)
-Get-FileHash wTerm-0.2.0-x64-setup.exe -Algorithm SHA256
+Get-FileHash wTerm-0.3.0-x64-setup.exe -Algorithm SHA256
 ```
 
 Compare against the SHA in the release asset list.
