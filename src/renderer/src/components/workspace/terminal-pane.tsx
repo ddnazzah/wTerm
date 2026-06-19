@@ -68,6 +68,15 @@ const parseConEmuProgress = (data: string): boolean | null => {
 // non-branding summary in the title. This is what keeps the halo from sticking.
 const TITLE_IDLE_MS = 1500
 const SPINNER_PREFIX = /^[✳⠀-⣿]/
+// Strip the leading decoration from a title before we show it in the sidebar:
+// the animated spinner glyph (braille frames U+2800–U+28FF or the ✳ marker) and
+// any bullet/middle-dot separator (·•‣⋅) that follows it, plus surrounding
+// whitespace. The braille glyph cycles every frame, so left in it reads as a dot
+// skittering horizontally next to the terminal name; the pulsing halo already
+// signals work, so the text only needs the task. Runs repeatedly so a
+// "spinner separator task" prefix collapses fully. Work-detection still uses the
+// raw title.
+const stripSpinner = (title: string): string => title.replace(/^[✳⠀-⣿·•‣⋅\s]+/, '')
 const titleIndicatesWork = (title: string): boolean => {
   if (!SPINNER_PREFIX.test(title)) return false
   // Animated braille frames (U+2800–U+28FF) only render while the spinner is
@@ -254,7 +263,18 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
     let titleWorking = false
     let idleTimer: ReturnType<typeof setTimeout> | null = null
 
-    const endTurn = (): void => {
+    // A turn can stop looking active in two ways, and only one means Claude is
+    // actually waiting on the user:
+    //  - 'idle': the title reverted to "✳ Claude Code" branding (or a plain shell
+    //    title). The agent is back at the prompt — a real "needs input" signal, so
+    //    raise attention + ring the bell.
+    //  - 'stall': a *working* title (spinner glyph still present) simply stopped
+    //    changing for TITLE_IDLE_MS. That happens mid-turn whenever a long tool run
+    //    isn't repainting the title, or when the agent leaves a summary in the
+    //    title — Claude isn't necessarily asking for anything. Drop the halo so it
+    //    doesn't stick, but do NOT raise attention or ring the bell. Firing here
+    //    was the source of the false "needs input" alarms.
+    const endTurn = (reason: 'idle' | 'stall'): void => {
       if (idleTimer) {
         clearTimeout(idleTimer)
         idleTimer = null
@@ -262,24 +282,26 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       if (!titleWorking) return
       titleWorking = false
       setBusy(false)
-      setAttention(terminalId, true)
-      bellRef.current?.('attention')
+      if (reason === 'idle') {
+        setAttention(terminalId, true)
+        bellRef.current?.('attention')
+      }
     }
 
     const titleDisposable = term.onTitleChange((title) => {
-      setTitle(terminalId, title)
+      setTitle(terminalId, stripSpinner(title))
       if (!titleIndicatesWork(title)) {
-        // Reverted to idle branding or a plain shell title — turn over now.
-        endTurn()
+        // Reverted to idle branding or a plain shell title — agent is waiting.
+        endTurn('idle')
         return
       }
       if (!titleWorking) {
         titleWorking = true
         setBusy(true) // also clears any pending attention (see setTerminalBusy)
       }
-      // Each animation frame resets the liveness timer; a stall fires endTurn.
+      // Each animation frame resets the liveness timer; a stall only drops the halo.
       if (idleTimer) clearTimeout(idleTimer)
-      idleTimer = setTimeout(endTurn, TITLE_IDLE_MS)
+      idleTimer = setTimeout(() => endTurn('stall'), TITLE_IDLE_MS)
     })
 
     // OSC 9 — iTerm2/ConEmu. Subtype `9;4;<state>` is ConEmu taskbar progress, a
