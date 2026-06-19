@@ -148,6 +148,8 @@ interface WorkspaceState {
   unreadByTerminal: Record<TerminalId, number>
   titleByTerminal: Record<TerminalId, string>
   busyByTerminal: Record<TerminalId, boolean>
+  /** Terminals whose agent finished a turn and is waiting on the user (red cue). */
+  attentionByTerminal: Record<TerminalId, boolean>
 
   sidebarWidth: number
   sidebarCollapsed: boolean
@@ -227,6 +229,8 @@ interface WorkspaceState {
   setTerminalTitle: (terminalId: TerminalId, title: string) => void
 
   setTerminalBusy: (terminalId: TerminalId, busy: boolean) => void
+  setTerminalAttention: (terminalId: TerminalId, attention: boolean) => void
+  clearAttention: (terminalId: TerminalId) => void
 }
 
 export const useWorkspace = create<WorkspaceState>((set) => ({
@@ -237,6 +241,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
   unreadByTerminal: {},
   titleByTerminal: {},
   busyByTerminal: {},
+  attentionByTerminal: {},
 
   sidebarWidth: readInitialSidebarWidth(),
   sidebarCollapsed: readInitialSidebarCollapsed(),
@@ -597,6 +602,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
       const { [terminalId]: _omittedUnread, ...unreadRest } = state.unreadByTerminal
       const { [terminalId]: _omittedTitle, ...titleRest } = state.titleByTerminal
       const { [terminalId]: _omittedBusy, ...busyRest } = state.busyByTerminal
+      const { [terminalId]: _omittedAttn, ...attnRest } = state.attentionByTerminal
       nextActive = wasActive
         ? remaining[0]?.id ?? null
         : state.activeTerminalByProject[projectId]
@@ -611,6 +617,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         unreadByTerminal: unreadRest,
         titleByTerminal: titleRest,
         busyByTerminal: busyRest,
+        attentionByTerminal: attnRest,
       }
     })
     if (nextActive !== undefined) {
@@ -711,7 +718,30 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
         const { [terminalId]: _omitted, ...rest } = state.busyByTerminal
         return { busyByTerminal: rest }
       }
-      return { busyByTerminal: { ...state.busyByTerminal, [terminalId]: true } }
+      // A new turn starting clears any pending "needs input" cue.
+      const { [terminalId]: _omittedAttn, ...attnRest } = state.attentionByTerminal
+      return {
+        busyByTerminal: { ...state.busyByTerminal, [terminalId]: true },
+        attentionByTerminal: attnRest,
+      }
+    }),
+
+  setTerminalAttention: (terminalId, attention) =>
+    set((state) => {
+      const current = !!state.attentionByTerminal[terminalId]
+      if (current === attention) return state
+      if (!attention) {
+        const { [terminalId]: _omitted, ...rest } = state.attentionByTerminal
+        return { attentionByTerminal: rest }
+      }
+      return { attentionByTerminal: { ...state.attentionByTerminal, [terminalId]: true } }
+    }),
+
+  clearAttention: (terminalId) =>
+    set((state) => {
+      if (!state.attentionByTerminal[terminalId]) return state
+      const { [terminalId]: _omitted, ...rest } = state.attentionByTerminal
+      return { attentionByTerminal: rest }
     }),
 }))
 

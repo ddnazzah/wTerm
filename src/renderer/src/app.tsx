@@ -25,6 +25,8 @@ export default function App() {
   const setProjectExpanded = useWorkspace((s) => s.setProjectExpanded)
   const bumpUnread = useWorkspace((s) => s.bumpUnread)
   const clearUnread = useWorkspace((s) => s.clearUnread)
+  const clearAttention = useWorkspace((s) => s.clearAttention)
+  const attentionByTerminal = useWorkspace((s) => s.attentionByTerminal)
   const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
   const sidebarCollapsed = useWorkspace((s) => s.sidebarCollapsed)
   const toggleSidebar = useWorkspace((s) => s.toggleSidebar)
@@ -92,19 +94,25 @@ export default function App() {
       setProjectExpanded(projectId, true)
       setActiveTerminal(projectId, terminalId)
       clearUnread(terminalId)
+      clearAttention(terminalId)
     })
     return offFocus
-  }, [selectProject, setActiveTerminal, setProjectExpanded, clearUnread])
+  }, [selectProject, setActiveTerminal, setProjectExpanded, clearUnread, clearAttention])
 
   useEffect(() => {
     if (!activeTerminalId) return
     const tryClear = (): void => {
-      if (document.hasFocus()) clearUnread(activeTerminalId)
+      if (document.hasFocus()) {
+        clearUnread(activeTerminalId)
+        clearAttention(activeTerminalId)
+      }
     }
+    // Re-runs when the active terminal raises attention while focused, so the red
+    // cue never lingers on the terminal you're already looking at.
     tryClear()
     window.addEventListener('focus', tryClear)
     return () => window.removeEventListener('focus', tryClear)
-  }, [activeTerminalId, clearUnread])
+  }, [activeTerminalId, clearUnread, clearAttention, attentionByTerminal])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -209,10 +217,11 @@ export default function App() {
       setProjectExpanded(pending.projectId, true)
       setActiveTerminal(pending.projectId, pending.terminalId)
       clearUnread(pending.terminalId)
+      clearAttention(pending.terminalId)
     }
     window.addEventListener('focus', onWindowFocus)
     return () => window.removeEventListener('focus', onWindowFocus)
-  }, [selectProject, setProjectExpanded, setActiveTerminal, clearUnread])
+  }, [selectProject, setProjectExpanded, setActiveTerminal, clearUnread, clearAttention])
 
   const showEmptyNoProject = !selectedProject
   const showEmptyNoTerminals = !!selectedProject && selectedProject.terminals.length === 0

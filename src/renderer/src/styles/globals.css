@@ -123,10 +123,10 @@ body {
   border-radius: 4px;
 }
 
-/* Sidebar item — pulses an accent halo around the left-edge indicator while
-   busy. Layers on top of the active/inactive bar color so the indicator keeps
-   reading as the active-tab marker. This halo is the sole per-terminal activity
-   cue; the terminal name also bolds while there's unread output. */
+/* Sidebar item — pulses an accent halo around the left-edge indicator while an
+   agent is actively working (its title spinner is animating). The halo stops the
+   instant the turn ends; a finished turn that awaits input switches to the red
+   "attention" pulse below instead. */
 .terminal-item-busy .terminal-item-indicator {
   animation: terminal-item-busy-halo 1.6s ease-in-out infinite;
 }
@@ -138,5 +138,21 @@ body {
   }
   50% {
     box-shadow: 0 0 6px 2px color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+}
+
+/* Sidebar item — a red halo while the agent has finished its turn and is waiting
+   on the user. Cleared as soon as the terminal is viewed/focused. */
+.terminal-item-attention .terminal-item-indicator {
+  animation: terminal-item-attention-halo 1.4s ease-in-out infinite;
+}
+
+@keyframes terminal-item-attention-halo {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 6px 2px color-mix(in oklab, #ef4444 65%, transparent);
   }
 }

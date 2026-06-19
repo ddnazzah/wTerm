@@ -6,6 +6,7 @@ interface Props {
   active: boolean
   unread: boolean
   busy?: boolean
+  attention?: boolean
   autoTitle?: string
   index: number
   projectId: string
@@ -20,6 +21,7 @@ export function TerminalSidebarItem({
   active,
   unread,
   busy,
+  attention,
   autoTitle,
   index,
   projectId,
@@ -82,6 +84,7 @@ export function TerminalSidebarItem({
           ? 'bg-accent/12 text-foreground'
           : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
         busy ? 'terminal-item-busy' : '',
+        attention && !busy ? 'terminal-item-attention' : '',
         dragOver ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : '',
       ].join(' ')}
       title={displayName}
@@ -89,13 +92,15 @@ export function TerminalSidebarItem({
       <span
         className={[
           'terminal-item-indicator inline-block w-2 h-2 rounded-full flex-shrink-0',
+          // Only shows when it means something; idle keeps a transparent slot so
+          // the label never shifts. Active is conveyed by the row highlight.
           busy
             ? 'bg-accent'
-            : unread
-              ? 'bg-sky-400'
-              : active
-                ? 'bg-accent'
-                : 'bg-foreground/25 group-hover/term:bg-foreground/40',
+            : attention
+              ? 'bg-red-500'
+              : unread
+                ? 'bg-sky-400'
+                : 'bg-transparent',
         ].join(' ')}
         aria-hidden
       />
