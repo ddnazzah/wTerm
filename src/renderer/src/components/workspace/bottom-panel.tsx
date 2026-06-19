@@ -27,6 +27,7 @@ export function BottomPanel({ home, onBell }: Props) {
   const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
   const unreadByTerminal = useWorkspace((s) => s.unreadByTerminal)
   const busyByTerminal = useWorkspace((s) => s.busyByTerminal)
+  const attentionByTerminal = useWorkspace((s) => s.attentionByTerminal)
 
   const dragRef = useRef<{ y: number; h: number } | null>(null)
 
@@ -150,6 +151,7 @@ export function BottomPanel({ home, onBell }: Props) {
               const name = titleByTerminal[t.id] || t.name
               const unread = (unreadByTerminal[t.id] ?? 0) > 0
               const busy = !!busyByTerminal[t.id]
+              const attention = !!attentionByTerminal[t.id]
               return (
                 <div
                   key={t.id}
@@ -160,6 +162,7 @@ export function BottomPanel({ home, onBell }: Props) {
                       ? 'bg-foreground/8 text-foreground'
                       : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground',
                     busy ? 'terminal-item-busy' : '',
+                    attention && !busy ? 'terminal-item-attention' : '',
                   ].join(' ')}
                   title={name}
                 >
@@ -168,11 +171,13 @@ export function BottomPanel({ home, onBell }: Props) {
                       'terminal-item-indicator inline-block w-2 h-2 rounded-full flex-shrink-0',
                       busy
                         ? 'bg-accent'
-                        : unread
-                          ? 'bg-sky-400'
-                          : isActive
-                            ? 'bg-accent'
-                            : 'bg-foreground/25 group-hover/ht:bg-foreground/40',
+                        : attention
+                          ? 'bg-red-500'
+                          : unread
+                            ? 'bg-sky-400'
+                            : isActive
+                              ? 'bg-accent'
+                              : 'bg-foreground/25 group-hover/ht:bg-foreground/40',
                     ].join(' ')}
                     aria-hidden
                   />

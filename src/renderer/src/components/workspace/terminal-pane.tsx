@@ -61,6 +61,12 @@ const parseConEmuProgress = (data: string): boolean | null => {
 // machine-readable "working" signal it emits, so we drive the busy indicator
 // from it. A spinner/✳ prefix that carries a task (anything other than the idle
 // "Claude Code" branding) means a turn is in flight.
+// How long a candidate spinner title may sit unchanged before we treat the turn
+// as finished. While an agent is actually working its title animates (spinner
+// frames + a ticking elapsed counter) well under this interval, so a title that
+// goes static for this long means the turn ended — even when the agent leaves a
+// non-branding summary in the title. This is what keeps the halo from sticking.
+const TITLE_IDLE_MS = 1500
 const SPINNER_PREFIX = /^[✳⠀-⣿]/
 const titleIndicatesWork = (title: string): boolean => {
   if (!SPINNER_PREFIX.test(title)) return false
@@ -238,21 +244,42 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
     }
 
     // The window title is both the tab label and — for agent TUIs like Claude
-    // Code — our "working" signal (see titleIndicatesWork). Drive the busy
-    // indicator off it, and on the working→idle edge (turn finished) raise the
-    // 'attention' signal. Whether that actually notifies is decided by the
-    // handler, which suppresses terminals the user is already looking at.
+    // Code — our "working" signal. The glow (busy) tracks the spinner *animating*,
+    // not merely the presence of a spinner glyph: a candidate title that stops
+    // changing for TITLE_IDLE_MS means the turn finished. On that edge we drop the
+    // glow and raise 'attention' (the red "needs input" cue). Whether it also
+    // notifies is decided by the handler, which suppresses focused terminals.
     const setTitle = useWorkspace.getState().setTerminalTitle
+    const setAttention = useWorkspace.getState().setTerminalAttention
     let titleWorking = false
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+    const endTurn = (): void => {
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        idleTimer = null
+      }
+      if (!titleWorking) return
+      titleWorking = false
+      setBusy(false)
+      setAttention(terminalId, true)
+      bellRef.current?.('attention')
+    }
+
     const titleDisposable = term.onTitleChange((title) => {
       setTitle(terminalId, title)
-      const working = titleIndicatesWork(title)
-      if (working === titleWorking) return
-      setBusy(working)
-      if (titleWorking && !working) {
-        bellRef.current?.('attention')
+      if (!titleIndicatesWork(title)) {
+        // Reverted to idle branding or a plain shell title — turn over now.
+        endTurn()
+        return
       }
-      titleWorking = working
+      if (!titleWorking) {
+        titleWorking = true
+        setBusy(true) // also clears any pending attention (see setTerminalBusy)
+      }
+      // Each animation frame resets the liveness timer; a stall fires endTurn.
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(endTurn, TITLE_IDLE_MS)
     })
 
     // OSC 9 — iTerm2/ConEmu. Subtype `9;4;<state>` is ConEmu taskbar progress, a
@@ -289,6 +316,7 @@ export function TerminalPane({ terminalId, active, onBell }: Props) {
       writeDisposable.dispose()
       bellDisposable.dispose()
       titleDisposable.dispose()
+      if (idleTimer) clearTimeout(idleTimer)
       osc9Disposable.dispose()
       osc52Disposable.dispose()
       ro.disconnect()

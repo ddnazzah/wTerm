@@ -49,12 +49,14 @@ export function ProjectItem({
   const unreadByTerminal = useWorkspace((s) => s.unreadByTerminal)
   const titleByTerminal = useWorkspace((s) => s.titleByTerminal)
   const busyByTerminal = useWorkspace((s) => s.busyByTerminal)
+  const attentionByTerminal = useWorkspace((s) => s.attentionByTerminal)
   const reorderTerminal = useWorkspace((s) => s.reorderTerminal)
   const [projDragOver, setProjDragOver] = useState(false)
 
   const { activeId, create, close, rename: renameTerminal, setActive } = useTerminals(project)
 
   const projectHasUnread = project.terminals.some((t) => (unreadByTerminal[t.id] ?? 0) > 0)
+  const projectHasAttention = project.terminals.some((t) => !!attentionByTerminal[t.id])
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(project.name)
@@ -170,11 +172,18 @@ export function ProjectItem({
           )}
         </div>
 
-        {!expanded && projectHasUnread && (
+        {!expanded && (projectHasAttention || projectHasUnread) && (
           <span
-            aria-label="Unread terminal activity"
-            title="A terminal in this project wants your input"
-            className="inline-block w-1.5 h-1.5 rounded-full bg-sky-400 flex-shrink-0 animate-pulse"
+            aria-label={projectHasAttention ? 'Terminal needs your input' : 'Unread terminal activity'}
+            title={
+              projectHasAttention
+                ? 'A terminal in this project needs your input'
+                : 'A terminal in this project has new output'
+            }
+            className={[
+              'inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse',
+              projectHasAttention ? 'bg-red-500' : 'bg-sky-400',
+            ].join(' ')}
           />
         )}
 
@@ -237,6 +246,7 @@ export function ProjectItem({
               active={selected && t.id === activeId}
               unread={(unreadByTerminal[t.id] ?? 0) > 0}
               busy={!!busyByTerminal[t.id]}
+              attention={!!attentionByTerminal[t.id]}
               autoTitle={titleByTerminal[t.id]}
               onSelect={() => {
                 if (!selected) onSelect()
