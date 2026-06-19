@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { HOME_PROJECT_ID } from '@shared/types'
 import type { Project, ProjectId, TerminalId, TerminalRecord } from '@shared/types'
 import { useSettings } from './settings'
 
@@ -749,12 +750,18 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
  * Create a terminal for a project and register it locally. Funnels every
  * "new tab" path through one place so the configured startup command (Settings
  * → Terminal) is applied consistently — and only to brand-new tabs.
+ *
+ * The Home ("global") workspace is exempt: it is a plain scratch shell, so the
+ * configured startup command never runs there.
  */
 export async function createProjectTerminal(
   projectId: ProjectId,
   opts?: { cwd?: string; name?: string }
 ): Promise<TerminalRecord | null> {
-  const startupCommand = useSettings.getState().terminal.startupCommand.trim() || undefined
+  const startupCommand =
+    projectId === HOME_PROJECT_ID
+      ? undefined
+      : useSettings.getState().terminal.startupCommand.trim() || undefined
   const record = await window.api.terminals.create({ projectId, startupCommand, ...opts })
   if (record) useWorkspace.getState().addTerminal(projectId, record)
   return record
