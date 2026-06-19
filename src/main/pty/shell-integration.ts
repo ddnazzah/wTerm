@@ -12,8 +12,14 @@ import { basename, join } from 'node:path'
 // in the shell script.
 
 const ZSH_INTEGRATION = `
-# wTerm shell integration (OSC 133).
-__tw_preexec() { print -Pn '\\e]133;C\\a' }
+# wTerm shell integration (OSC 133 working markers + OSC 697 agent capture).
+# OSC 697;Cmd reports the command line + cwd (base64) so wTerm can re-run a
+# running agent (claude, aider, ...) after a restart. base64 keeps arbitrary
+# command text safe inside the escape sequence.
+__tw_preexec() {
+  print -Pn '\\e]133;C\\a'
+  printf '\\e]697;Cmd;%s;%s\\a' "\$(print -rn -- "\$1" | base64 | tr -d '\\n')" "\$(print -rn -- "\$PWD" | base64 | tr -d '\\n')"
+}
 __tw_precmd()  { print -Pn "\\e]133;D;\${?}\\a" }
 autoload -Uz add-zsh-hook 2>/dev/null
 if typeset -f add-zsh-hook >/dev/null; then
@@ -28,6 +34,7 @@ __tw_preexec() {
   [[ -n "\$COMP_LINE" ]] && return
   [[ "\$BASH_COMMAND" == "\$PROMPT_COMMAND" ]] && return
   printf '\\e]133;C\\a'
+  printf '\\e]697;Cmd;%s;%s\\a' "\$(printf '%s' "\$BASH_COMMAND" | base64 | tr -d '\\n')" "\$(printf '%s' "\$PWD" | base64 | tr -d '\\n')"
 }
 __tw_precmd() {
   local ec=\$?
@@ -44,6 +51,7 @@ const FISH_INTEGRATION = `
 # wTerm shell integration (OSC 133).
 function __tw_preexec --on-event fish_preexec
     printf '\\e]133;C\\a'
+    printf '\\e]697;Cmd;%s;%s\\a' (string join ' ' -- \$argv | base64 | tr -d '\\n') (printf '%s' "\$PWD" | base64 | tr -d '\\n')
 end
 function __tw_postexec --on-event fish_postexec
     printf '\\e]133;D;%s\\a' \$status

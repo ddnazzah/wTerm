@@ -22,6 +22,15 @@ export interface TerminalRecord {
    * and remain session-scoped (not restored).
    */
   claudeSessionId?: string
+  /**
+   * The long-running agent command (and the cwd it ran in) that was active in
+   * this tab at last save, captured from shell integration (OSC 697). On the
+   * next launch the tab is recreated in that cwd running the command's "resume"
+   * form (see the resume map in renderer settings) so agents like `claude`,
+   * `cursor-agent`, or `aider` pick up where they left off. Unset for tabs that
+   * were idling at a prompt.
+   */
+  agent?: { command: string; cwd: string }
 }
 
 export interface Project {
@@ -69,6 +78,14 @@ export interface CreateTerminalOptions {
 
 export type TerminalDataPayload = { id: TerminalId; data: string }
 export type TerminalExitPayload = { id: TerminalId; exitCode: number; signal?: number }
+/**
+ * Reported by the renderer when a tab's foreground command starts (`agent` set)
+ * or finishes (`agent` null), parsed from the OSC 697 shell-integration marker.
+ */
+export type RunningCommandPayload = {
+  id: TerminalId
+  agent: { command: string; cwd: string } | null
+}
 
 export const IPC = {
   projects: {
@@ -91,6 +108,7 @@ export const IPC = {
     data: 'terminals:data',
     exit: 'terminals:exit',
     setActive: 'terminals:set-active',
+    runningCommand: 'terminals:running-command',
   },
   dialog: {
     pickFolder: 'dialog:pick-folder',

@@ -1,6 +1,23 @@
 import { useCallback, useEffect } from 'react'
 import { useWorkspace } from '@renderer/state/store'
-import { useSettings } from '@renderer/state/settings'
+import { useSettings, type AgentRestoreRule } from '@renderer/state/settings'
+
+/** The command to relaunch a captured agent, by matching its program basename. */
+function resumeCommandFor(command: string, rules: AgentRestoreRule[]): string | null {
+  const first = command.trim().split(/\s+/)[0] ?? ''
+  const base = first.split(/[/\\]/).pop() ?? first
+  return rules.find((r) => r.match === base)?.resume ?? null
+}
+
+/** Project-relative cwd for a captured absolute agent cwd, or undefined (root). */
+function relativeCwd(projectPath: string, cwd: string): string | undefined {
+  const root = projectPath.replace(/[/\\]+$/, '')
+  if (!cwd || cwd === root) return undefined
+  if (cwd.startsWith(root + '/') || cwd.startsWith(root + '\\')) {
+    return cwd.slice(root.length + 1) || undefined
+  }
+  return undefined // ran outside the project root → fall back to the root
+}
 
 // useProjects is consumed by more than one component, so its bootstrap effect
 // runs once per consumer. Restoring Claude tabs must happen exactly once per app
@@ -34,17 +51,32 @@ export function useProjects() {
       // at most once per launch even though multiple components mount this hook.
       if (claudeRestoreStarted) return
       claudeRestoreStarted = true
-      const startupCommand = useSettings.getState().terminal.startupCommand.trim() || undefined
+      const settings = useSettings.getState()
+      const startupCommand = settings.terminal.startupCommand.trim() || undefined
+      const { enabled: agentRestoreEnabled, rules } = settings.agentRestore
       for (const project of snapshot.projects) {
         for (const terminal of project.terminals) {
-          if (!terminal.claudeSessionId) continue
-          void window.api.terminals.create({
-            projectId: project.id,
-            id: terminal.id,
-            name: terminal.name,
-            resumeSessionId: terminal.claudeSessionId,
-            startupCommand,
-          })
+          if (terminal.claudeSessionId) {
+            // Pinned Claude session — resume by id (existing path).
+            void window.api.terminals.create({
+              projectId: project.id,
+              id: terminal.id,
+              name: terminal.name,
+              resumeSessionId: terminal.claudeSessionId,
+              startupCommand,
+            })
+          } else if (terminal.agent && agentRestoreEnabled) {
+            // Captured agent command — relaunch its resume form in its folder.
+            const resume = resumeCommandFor(terminal.agent.command, rules)
+            if (!resume) continue
+            void window.api.terminals.create({
+              projectId: project.id,
+              id: terminal.id,
+              name: terminal.name,
+              cwd: relativeCwd(project.path, terminal.agent.cwd),
+              startupCommand: resume,
+            })
+          }
         }
       }
     })

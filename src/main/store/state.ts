@@ -42,13 +42,12 @@ export async function loadState(): Promise<AppState> {
     const raw = await fs.readFile(statePath(), 'utf-8')
     const parsed = JSON.parse(raw) as AppState
     if (parsed?.version === 1 && Array.isArray(parsed.projects)) {
-      // Only Claude tabs are restorable: a bare shell can't be resumed
-      // meaningfully (its program is gone), but a Claude tab can be brought back
-      // via `claude --resume <claudeSessionId>`. Drop every other terminal on
-      // load, and keep the active-tab map only for ids that survived.
+      // Restorable tabs: a pinned Claude session (`claudeSessionId`) or a
+      // captured agent command (`agent`, from OSC 697) that can be re-launched.
+      // A plain shell can't be resumed (its program is gone), so it's dropped.
       const projects = parsed.projects.map((p) => ({
         ...p,
-        terminals: (p.terminals ?? []).filter((t) => t.claudeSessionId),
+        terminals: (p.terminals ?? []).filter((t) => t.claudeSessionId || t.agent),
       }))
       const survivingIds = new Set(projects.flatMap((p) => p.terminals.map((t) => t.id)))
       const activeTerminalByProject = Object.fromEntries(
@@ -123,12 +122,12 @@ function scheduleSave(): void {
 async function writeFile(): Promise<void> {
   const target = statePath()
   const tmp = `${target}.tmp`
-  // Persist only Claude tabs (those carry a claudeSessionId) so they can be
-  // resumed next launch; bare-shell tabs stay session-scoped and are dropped.
-  // The Home workspace is synthesized fresh each launch and never persisted.
+  // Persist restorable tabs only: a pinned Claude session (claudeSessionId) or a
+  // captured agent command (agent). Plain shells stay session-scoped and are
+  // dropped. The Home workspace is synthesized fresh each launch, never persisted.
   const projects = cache.projects
     .filter((p) => !p.isDefault)
-    .map((p) => ({ ...p, terminals: p.terminals.filter((t) => t.claudeSessionId) }))
+    .map((p) => ({ ...p, terminals: p.terminals.filter((t) => t.claudeSessionId || t.agent) }))
   const survivingIds = new Set(projects.flatMap((p) => p.terminals.map((t) => t.id)))
   const activeTerminalByProject = Object.fromEntries(
     Object.entries(cache.activeTerminalByProject ?? {}).filter(
