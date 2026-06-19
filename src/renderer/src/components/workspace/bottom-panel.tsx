@@ -169,15 +169,14 @@ export function BottomPanel({ home, onBell }: Props) {
                   <span
                     className={[
                       'terminal-item-indicator inline-block w-2 h-2 rounded-full flex-shrink-0',
+                      // Only shows when meaningful; idle keeps a transparent slot.
                       busy
                         ? 'bg-accent'
                         : attention
                           ? 'bg-red-500'
                           : unread
                             ? 'bg-sky-400'
-                            : isActive
-                              ? 'bg-accent'
-                              : 'bg-foreground/25 group-hover/ht:bg-foreground/40',
+                            : 'bg-transparent',
                     ].join(' ')}
                     aria-hidden
                   />
