@@ -136,7 +136,7 @@ export function ProjectItem({
           'group/proj relative flex items-center gap-1 px-1 py-1 rounded-md cursor-pointer transition-colors',
           selected
             ? 'text-foreground/90'
-            : 'text-foreground/45 hover:text-foreground/75',
+            : 'text-foreground/65 hover:text-foreground/90',
           projDragOver ? 'shadow-[inset_0_2px_0_0_var(--accent)]' : '',
         ].join(' ')}
         title={project.path}
