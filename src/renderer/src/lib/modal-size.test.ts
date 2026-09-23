@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { modalSizeFor, clampModalSize } from './modal-size'
+import { modalSizeFor, clampModalSize, modalBoxIn } from './modal-size'
 
 const laptop = { width: 1440, height: 900 }
 const studio = { width: 5120, height: 2880 }
@@ -114,5 +114,52 @@ describe('clampModalSize', () => {
       width: 420,
       height: 300,
     })
+  })
+})
+
+describe('modalBoxIn — the floating editor stays inside the workspace', () => {
+  // A 1280 viewport minus the 256px project list, a 340px right panel and the
+  // 44px activity bar: the box the editor may actually use.
+  const host = { left: 256, top: 50, width: 640, height: 720 }
+
+  test('never reaches past the host box, so app chrome stays clickable', () => {
+    // Arrange / Act
+    const box = modalBoxIn(host, null)
+
+    // Assert — the regression this guards: a card wider than its host covered
+    // the right sidebar's toolbar and swallowed every click on it.
+    expect(box.left).toBeGreaterThanOrEqual(host.left)
+    expect(box.top).toBeGreaterThanOrEqual(host.top)
+    expect(box.left + box.width).toBeLessThanOrEqual(host.left + host.width)
+    expect(box.top + box.height).toBeLessThanOrEqual(host.top + host.height)
+  })
+
+  test('centres the card in the host rather than the viewport', () => {
+    // Arrange / Act
+    const box = modalBoxIn(host, null)
+
+    // Assert
+    expect(box.left - host.left).toBeCloseTo(host.left + host.width - (box.left + box.width), 0)
+  })
+
+  test('clamps a saved size larger than the host', () => {
+    // Arrange / Act
+    const box = modalBoxIn(host, { width: 4000, height: 4000 })
+
+    // Assert
+    expect(box.width).toBeLessThanOrEqual(host.width)
+    expect(box.height).toBeLessThanOrEqual(host.height)
+  })
+
+  test('stays inside a host smaller than the usable minimum', () => {
+    // Arrange — a heavily collapsed workspace is still not licence to overflow.
+    const tiny = { left: 0, top: 0, width: 300, height: 200 }
+
+    // Act
+    const box = modalBoxIn(tiny, null)
+
+    // Assert
+    expect(box.width).toBeLessThanOrEqual(tiny.width)
+    expect(box.height).toBeLessThanOrEqual(tiny.height)
   })
 })

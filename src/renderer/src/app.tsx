@@ -356,7 +356,9 @@ export default function App() {
         {!sidebarCollapsed && <ProjectList />}
         <div className="flex flex-col flex-1 min-w-0 gap-1.5">
           <div className="flex flex-1 min-h-0 gap-1.5">
-            <main className="flex-1 flex flex-col min-w-0">
+            {/* The floating editor measures itself against this box, so it
+                never covers the sidebars or the activity bar. */}
+            <main data-editor-host className="flex-1 flex flex-col min-w-0">
               <div className="flex flex-col h-full rounded-lg bg-background overflow-hidden">
                 {selectedProject && selectedHasOpenFiles && editorViewMode === 'docked' ? (
                   <DockedEditor projectId={selectedProject.id} onClose={closeAllFiles}>

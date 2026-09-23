@@ -3,6 +3,11 @@ export interface Size {
   height: number
 }
 
+export interface Box extends Size {
+  left: number
+  top: number
+}
+
 /** Fraction of the viewport the modal takes when the user has not resized it. */
 const WIDTH_RATIO = 0.92
 const HEIGHT_RATIO = 0.92
@@ -63,6 +68,30 @@ export function modalSizeFor(viewport: Size, saved: Size | null): Size {
   return {
     width: clamp(saved.width, MIN_WIDTH, viewport.width - EDGE_MARGIN),
     height: clamp(saved.height, MIN_HEIGHT, viewport.height - EDGE_MARGIN),
+  }
+}
+
+/**
+ * Place the floating editor inside `host` — the workspace's content area, not
+ * the whole window.
+ *
+ * Sizing against the viewport is what broke: a card 92% of the window wide
+ * reached under the right sidebar and the activity bar, and every button there
+ * stopped responding because the clicks landed on the editor instead. The
+ * chrome around the workspace has to stay reachable while a file is open, so
+ * the card is measured and centred against the space the workspace actually
+ * owns, and is never allowed to exceed it — not even to honour MIN_WIDTH.
+ */
+export function modalBoxIn(host: Box, saved: Size | null): Box {
+  const fitted = modalSizeFor({ width: host.width, height: host.height }, saved)
+  const width = Math.min(fitted.width, host.width)
+  const height = Math.min(fitted.height, host.height)
+
+  return {
+    left: host.left + (host.width - width) / 2,
+    top: host.top + (host.height - height) / 2,
+    width,
+    height,
   }
 }
 
