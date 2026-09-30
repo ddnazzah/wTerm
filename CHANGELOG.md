@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.3
+
+### Fixed
+
+- **Buttons under the floating editor**: widening the floating window to 92% of
+  the viewport in 0.7.2 pushed it under the right sidebar and the activity bar,
+  where it swallowed every click meant for them — Refresh, New file and New
+  folder simply did nothing. The card and its scrim are now sized and centred
+  against the workspace's content area, so the panels around it stay live while
+  a file is open. The same overlap, in its milder 0.7.1 form, was the cause of
+  buttons that only responded near their outer edge.
+
 ## 0.7.2
 
 ### Added
