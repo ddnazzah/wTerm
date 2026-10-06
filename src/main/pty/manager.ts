@@ -10,15 +10,20 @@ import type {
 import { getDefaultShell, prepareShellIntegration } from './shell-integration'
 import { OscParser } from './activity/osc-parser'
 import { ActivityMachine } from './activity/activity-machine'
+import { ScreenMirror } from './screen-mirror'
 import type { SessionActivity } from './activity/types'
 import type { AgentHookEvent } from '../agent/hook-event'
-import { resolveRelease, resolveResize, type ResizeSource } from './resize-authority'
+import {
+  resolveRelease,
+  resolveResize,
+  type ResizeSource,
+  type TerminalSize,
+} from './resize-authority'
 
 /** Notified on every session activity transition (for firing notifications). */
 export type NotifyHook = (id: TerminalId, prev: SessionActivity, next: SessionActivity) => void
 
 const COALESCE_MS = 16
-const MAX_BUFFER_LINES = 10_000
 // Startup commands are injected on the shell's first prompt marker (OSC 133;D
 // from precmd — the rc has finished loading). Shells without integration never
 // emit it, so a timer after first output serves as the fallback.
@@ -29,7 +34,11 @@ interface PtyEntry {
   pty: IPty
   pendingData: string[]
   flushTimer: NodeJS.Timeout | null
-  buffer: string[]
+  /**
+   * What the PTY has drawn, held as cells rather than as the bytes that drew
+   * them, so each client can be given history laid out for its own width.
+   */
+  mirror: ScreenMirror
   /** Command to inject once, at the first prompt (or fallback); null once sent. */
   startupCommand: string | null
   /** Fallback injection timer for shells without integration; null once armed off. */
@@ -172,7 +181,7 @@ export class PtyManager {
       pty,
       pendingData: [],
       flushTimer: null,
-      buffer: [],
+      mirror: new ScreenMirror(cols, rows),
       startupCommand,
       injectFallback: null,
       parser: new OscParser(),
@@ -187,10 +196,7 @@ export class PtyManager {
 
     pty.onData((data) => {
       entry.pendingData.push(data)
-      entry.buffer.push(data)
-      if (entry.buffer.length > MAX_BUFFER_LINES) {
-        entry.buffer.splice(0, entry.buffer.length - MAX_BUFFER_LINES)
-      }
+      entry.mirror.write(data)
       if (entry.flushTimer === null) {
         entry.flushTimer = setTimeout(() => this.flush(entry), COALESCE_MS)
       }
@@ -222,6 +228,7 @@ export class PtyManager {
         entry.injectFallback = null
       }
       this.flush(entry)
+      entry.mirror.dispose()
       this.entries.delete(opts.id)
       this.activity.delete(opts.id)
       const payload: TerminalExitPayload = { id: opts.id, exitCode, signal }
@@ -313,7 +320,17 @@ export class PtyManager {
     if (applied) this.applyResize(entry, applied.cols, applied.rows)
   }
 
+  /** The grid the PTY is actually running at, for sizing a snapshot to match. */
+  currentSize(id: TerminalId): TerminalSize {
+    const entry = this.entries.get(id)
+    if (!entry) return { cols: 80, rows: 24 }
+    return entry.appliedSize ?? entry.desktopSize
+  }
+
   private applyResize(entry: PtyEntry, cols: number, rows: number): void {
+    // The mirror has to track the pty, or its buffer stops matching what the
+    // program believes it drew.
+    entry.mirror.resize(cols, rows)
     try {
       entry.pty.resize(cols, rows)
     } catch {
@@ -332,11 +349,12 @@ export class PtyManager {
   }
 
   /**
-   * Returns everything the PTY has emitted so far and cancels any pending flush.
-   * Pending chunks are already captured in `buffer`, so dropping the next flush
-   * prevents the renderer from receiving them twice once it subscribes.
+   * Everything the PTY has drawn, rendered for the desktop's own grid, with any
+   * pending flush cancelled. Those chunks are already in the mirror, so dropping
+   * the next flush prevents the renderer from receiving them twice once it
+   * subscribes.
    */
-  attach(id: TerminalId): string {
+  async attach(id: TerminalId): Promise<string> {
     const entry = this.entries.get(id)
     if (!entry) return ''
     if (entry.flushTimer !== null) {
@@ -344,29 +362,32 @@ export class PtyManager {
       entry.flushTimer = null
     }
     entry.pendingData = []
-    return entry.buffer.join('')
+    const { cols, rows } = entry.appliedSize ?? entry.desktopSize
+    return entry.mirror.snapshot(cols, rows)
   }
 
   /**
-   * Snapshot for a newly-attaching mobile-bridge client. Unlike {@link attach}
-   * (which clears pending data to dedup for the sole desktop renderer), this
-   * first flushes any pending bytes to all *current* consumers, then returns the
-   * full buffer. The caller MUST add the client to its subscription set only
-   * after this returns synchronously — that way the flushed bytes reach existing
+   * Snapshot for a newly-attaching mobile-bridge client, laid out for the size
+   * that client reports rather than for whatever width the output was written
+   * at. Unlike {@link attach} (which clears pending data to dedup for the sole
+   * desktop renderer), this first flushes any pending bytes to all *current*
+   * consumers. The caller MUST add the client to its subscription set in the
+   * same turn this is awaited — that way the flushed bytes reach existing
    * consumers (not the new client) and every byte after the snapshot arrives via
    * the live sink exactly once, with no gap and no duplication.
    */
-  snapshotForBridge(id: TerminalId): string {
+  async snapshotForBridge(id: TerminalId, cols: number, rows: number): Promise<string> {
     const entry = this.entries.get(id)
     if (!entry) return ''
     this.flush(entry)
-    return entry.buffer.join('')
+    return entry.mirror.snapshot(cols, rows)
   }
 
   // Called on app quit. Kills every pty (and the shell + child processes running
   // in it); terminals are recreated fresh from persisted state on next launch.
   disposeAll(): void {
     for (const entry of this.entries.values()) {
+      entry.mirror.dispose()
       try {
         entry.pty.kill()
       } catch {

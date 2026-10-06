@@ -140,7 +140,7 @@ export function registerTerminalIpc(pty: PtyManager): void {
     (_e, opts: CreateTerminalOptions): TerminalRecord | null => createTerminal(pty, opts)
   )
 
-  ipcMain.handle(IPC.terminals.attach, (_e, id: string): string => {
+  ipcMain.handle(IPC.terminals.attach, (_e, id: string): Promise<string> => {
     return pty.attach(id)
   })
 

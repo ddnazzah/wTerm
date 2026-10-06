@@ -172,20 +172,20 @@ function handleServerMessage(msg: BridgeServerMessage): void {
     case 'attached':
       if (msg.id === ui.currentTermId && term && fit) {
         term.reset()
-        // Fit to the phone's real width BEFORE replaying the snapshot, so the
-        // buffered bytes are interpreted once at the final column count instead
-        // of at xterm's 80-col default and then reflowed — the double pass is
-        // what shreds wide desktop-authored output into 1–2 chars per line.
+        // The snapshot was serialised for the grid we sent with the attach, so
+        // it needs no refit here — re-fitting now would reflow it a second time,
+        // which is what used to shred the history into ragged 1-2 char lines.
+        // Only correct the size if the viewport moved while we were waiting.
         try {
           fit.fit()
         } catch {
           // element not laid out yet; a later resize event will refit
         }
         term.write(msg.snapshot)
-        // Push our dimensions so the shared PTY resizes and the running program
-        // repaints its live UI at the phone's width.
-        lastSentSize = { cols: term.cols, rows: term.rows }
-        send({ type: 'resize', id: msg.id, cols: term.cols, rows: term.rows })
+        if (term.cols !== lastSentSize?.cols || term.rows !== lastSentSize?.rows) {
+          lastSentSize = { cols: term.cols, rows: term.rows }
+          send({ type: 'resize', id: msg.id, cols: term.cols, rows: term.rows })
+        }
       }
       break
     case 'data':
@@ -242,7 +242,17 @@ function attachTerminal(id: TerminalId): void {
   // phone size authority.
   lastSentSize = null
   term?.reset()
-  send({ type: 'attach', id })
+  // Fit before asking, so the attach carries the grid we will actually render
+  // into. Main sizes the pty and the snapshot to it, and the history comes back
+  // already laid out for this screen instead of at the desktop's width.
+  try {
+    fit?.fit()
+  } catch {
+    // not laid out yet; the resize that follows attachment will correct it
+  }
+  const grid = term ? { cols: term.cols, rows: term.rows } : null
+  if (grid) lastSentSize = grid
+  send({ type: 'attach', id, ...(grid ?? {}) })
   const proj = currentProject()
   if (proj) send({ type: 'setActive', projectId: proj.id, id })
   renderTabs()

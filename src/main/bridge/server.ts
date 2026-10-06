@@ -44,6 +44,11 @@ const MIME: Record<string, string> = {
 }
 
 /** Locate the built PWA assets. Overridable in dev via WTERM_PWA_DIR. */
+/** A grid dimension a client sent us is only usable if it is a real count. */
+function isGrid(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 1
+}
+
 function pwaDir(): string {
   return process.env.WTERM_PWA_DIR || join(__dirname, '../pwa')
 }
@@ -340,9 +345,18 @@ export class MobileBridge {
 
     switch (msg.type) {
       case 'attach': {
+        // Take size authority first: the phone is about to become the viewer, so
+        // the snapshot, the pty and the program's next repaint all agree on one
+        // width instead of the phone replaying desktop-width history.
+        // Network-facing: the cast after JSON.parse guarantees nothing, and a
+        // NaN would reach ioctl as a bogus window size.
+        if (isGrid(msg.cols) && isGrid(msg.rows)) {
+          this.pty.resize(msg.id, msg.cols, msg.rows, 'bridge')
+        }
+        const size = this.pty.currentSize(msg.id)
         // Snapshot BEFORE subscribing so flushed-pending bytes go to existing
         // consumers and every byte after the snapshot arrives once via the sink.
-        const snapshot = this.pty.snapshotForBridge(msg.id)
+        const snapshot = await this.pty.snapshotForBridge(msg.id, size.cols, size.rows)
         client.subscribed.add(msg.id)
         this.registry.sendTo(client, { type: 'attached', id: msg.id, snapshot })
         break

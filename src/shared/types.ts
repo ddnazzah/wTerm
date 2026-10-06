@@ -460,7 +460,9 @@ export type BridgeServerMessage =
 
 /** Messages a phone client sends up to the bridge server over the WebSocket. */
 export type BridgeClientMessage =
-  | { type: 'attach'; id: TerminalId }
+  // cols/rows let the snapshot be laid out for this client's width; absent
+  // (an older client) it falls back to the size the pty currently has.
+  | { type: 'attach'; id: TerminalId; cols?: number; rows?: number }
   | { type: 'detach'; id: TerminalId }
   | { type: 'input'; id: TerminalId; data: string }
   | { type: 'resize'; id: TerminalId; cols: number; rows: number }
