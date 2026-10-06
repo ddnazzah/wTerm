@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.4
+
+### Fixed
+
+- **Mobile scrollback**: history replayed onto the phone was shredded — fragments
+  down the left, single characters stacked at the right edge — while anything
+  written after the phone connected looked fine. The snapshot was the raw pty
+  byte log, which encodes the geometry of the terminal that produced it: hard
+  wraps at the desktop's column count, and absolute cursor moves to columns a
+  phone does not have, which clamp to its last column. Each client is now served
+  from a headless terminal that holds cells rather than bytes, resized to that
+  client's grid and reflowed by xterm before it is sent, so history arrives laid
+  out for the screen about to draw it.
+
 ## 0.7.3
 
 ### Fixed
