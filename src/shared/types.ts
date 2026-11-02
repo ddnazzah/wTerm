@@ -188,6 +188,55 @@ export interface BoardSnapshot {
   settings: BoardSettings
 }
 
+// ---- Session todos ----
+
+export const TODO_BUCKETS = ['now', 'tomorrow', 'future'] as const
+export type TodoBucket = (typeof TODO_BUCKETS)[number]
+
+export const TODO_STATUSES = ['open', 'done', 'dismissed'] as const
+export type TodoStatus = (typeof TODO_STATUSES)[number]
+
+export interface TodoCardRef {
+  projectId: ProjectId
+  number: number
+}
+
+/** Something the user must do, extracted from a Claude session (see src/main/todos). */
+export interface Todo {
+  /** Stable hash of session and title, so re-imports cannot duplicate it. */
+  id: string
+  title: string
+  detail: string
+  bucket: TodoBucket
+  status: TodoStatus
+  sessionId: string
+  /** Absolute folder the session ran in; resuming requires this exact folder. */
+  cwd: string
+  branch: string
+  createdAt: string
+  closedAt?: string
+  /** Set once sent to a project board. */
+  card?: TodoCardRef
+}
+
+/** What the background collector last reported about itself. */
+export interface CollectorStatus {
+  lastRunAt: string
+  lastSuccessAt?: string
+  lastError: string | null
+}
+
+export interface TodosSnapshot {
+  todos: Todo[]
+  /** Null until the collector has run. */
+  collector: CollectorStatus | null
+}
+
+export interface SendTodoResult {
+  ok: boolean
+  error?: string
+}
+
 export interface CreateCardInput {
   projectId: ProjectId
   title: string
@@ -341,6 +390,15 @@ export const IPC = {
     pruneWorktree: 'board:prune-worktree',
     /** main → renderer push after any board mutation (scheduler included) */
     changed: 'board:changed',
+  },
+  /** Todos collected from Claude sessions (see src/main/todos). */
+  todos: {
+    snapshot: 'todos:snapshot',
+    setStatus: 'todos:set-status',
+    sendToBoard: 'todos:send-to-board',
+    folderExists: 'todos:folder-exists',
+    /** main → renderer push after an import or a status change */
+    changed: 'todos:changed',
   },
   /** Mobile-bridge control + reachability (see src/main/bridge). */
   bridge: {

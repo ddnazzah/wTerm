@@ -4,7 +4,7 @@
 
 import { spawn } from 'node:child_process'
 import { promises as fs } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import { branchForCard, worktreeDirName, worktreeRootFor } from './worktree-path'
 
 interface RunResult {
@@ -101,6 +101,17 @@ export async function allocateWorktree(
     ok: true,
     allocation: { cwd: path, worktreePath: path, branch, note: `worktree ${path} on ${branch}` },
   }
+}
+
+/**
+ * The main checkout that owns `cwd`, which may be a linked worktree. Null when `cwd`
+ * is missing or not in a repo, or when the repo's git dir is not a plain `.git`.
+ */
+export async function mainRepoPath(cwd: string): Promise<string | null> {
+  const res = await git(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd)
+  if (res.code !== 0) return null
+  const commonDir = res.stdout.trim()
+  return basename(commonDir) === '.git' ? dirname(commonDir) : null
 }
 
 /**

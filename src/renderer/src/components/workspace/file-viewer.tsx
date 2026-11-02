@@ -6,6 +6,7 @@ import { formattableParser, formatText } from '@renderer/lib/formatter'
 import { isVirtualTab, noteTabPath, parseTabPath } from '@renderer/lib/tab-uri'
 import { BoardTab } from '../board/board-tab'
 import { NotesTab } from '../board/notes-tab'
+import { TodosTab } from '../todos/todos-tab'
 import { MonacoEditor, gcMonacoModels } from './monaco-editor'
 import { MarkdownPreview } from './markdown-preview'
 import { MediaViewer } from './media-viewer'
@@ -133,6 +134,7 @@ function TabPane({
   const target = parseTabPath(file.path)
 
   if (target.kind === 'board') return <BoardTab projectId={projectId} />
+  if (target.kind === 'todos') return <TodosTab />
   if (target.kind === 'note') {
     return (
       <NotesTab

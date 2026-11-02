@@ -12,7 +12,10 @@ import { registerGitHubIpc } from './ipc/github'
 import { registerBridgeIpc } from './ipc/bridge'
 import { registerBoardIpc } from './ipc/board'
 import { registerAgentIpc, startAgentHooks, stopAgentHooks } from './ipc/agent'
+import { registerTodosIpc } from './ipc/todos'
 import { BoardScheduler } from './board/scheduler'
+import { TodoStore } from './todos/store'
+import { watchSuggestions } from './todos/watcher'
 import { IPC } from '@shared/types'
 import { loadState, saveStateNow } from './store/state'
 import { setSyncWindow } from './sync'
@@ -140,6 +143,19 @@ app.whenReady().then(async () => {
   const boardScheduler = new BoardScheduler(ptyManager, notifyBoardChanged)
   registerBoardIpc(boardScheduler, notifyBoardChanged)
   boardScheduler.start()
+
+  // Todos are collected outside the app, so this only imports what has arrived. A
+  // failure here must not take the app down.
+  const notifyTodosChanged = (): void => {
+    mainWindow?.webContents.send(IPC.todos.changed)
+  }
+  const todosDir = join(app.getPath('userData'), 'session-todos')
+  const todoStore = new TodoStore(todosDir)
+  registerTodosIpc(todoStore, notifyTodosChanged, notifyBoardChanged)
+  todoStore
+    .load()
+    .then(() => watchSuggestions(todosDir, todoStore, notifyTodosChanged))
+    .catch((err) => console.error('[todos] failed to start:', err))
 
   // Start the loopback listener that Claude Code's hooks report into. A bind
   // failure must not take the app down — wTerm falls back to reading window

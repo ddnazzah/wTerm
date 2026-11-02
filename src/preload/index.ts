@@ -11,6 +11,9 @@ import {
   type CreateCardInput,
   type MoveCardInput,
   type Note,
+  type SendTodoResult,
+  type TodoStatus,
+  type TodosSnapshot,
   type UpdateCardInput,
   type CreatePullRequestInput,
   type CreateTerminalOptions,
@@ -122,6 +125,20 @@ const api = {
       const listener = (_: unknown, state: AppState) => cb(state)
       ipcRenderer.on(IPC.state.changed, listener)
       return () => ipcRenderer.off(IPC.state.changed, listener)
+    },
+  },
+  todos: {
+    snapshot: (): Promise<TodosSnapshot> => ipcRenderer.invoke(IPC.todos.snapshot),
+    setStatus: (id: string, status: TodoStatus): Promise<void> =>
+      ipcRenderer.invoke(IPC.todos.setStatus, id, status),
+    sendToBoard: (id: string): Promise<SendTodoResult> =>
+      ipcRenderer.invoke(IPC.todos.sendToBoard, id),
+    folderExists: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.todos.folderExists, id),
+    onChanged: (cb: () => void): (() => void) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IPC.todos.changed, listener)
+      return () => ipcRenderer.off(IPC.todos.changed, listener)
     },
   },
   board: {

@@ -20,6 +20,8 @@
     "rebuild": "electron-rebuild -f -w node-pty",
     "postinstall": "electron-rebuild -f -w node-pty || exit 0",
     "build:icons": "node scripts/build-icons.mjs",
+    "todos:install": "node scripts/session-todos/install.mjs",
+    "todos:uninstall": "node scripts/session-todos/install.mjs --uninstall",
     "dist": "pnpm build:icons && electron-vite build && pnpm build:pwa && electron-builder",
     "dist:mac": "pnpm build:icons && electron-vite build && pnpm build:pwa && electron-builder --mac",
     "dist:win": "pnpm build:icons && electron-vite build && pnpm build:pwa && electron-builder --win"
