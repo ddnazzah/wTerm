@@ -72,11 +72,13 @@ export function FileTabs({ projectId }: Props) {
         const name =
           target.kind === 'board'
             ? 'Board'
-            : target.kind === 'note'
-              ? notes.find((n) => n.id === target.noteId)?.title || 'Untitled note'
-              : diff
-                ? diffTabLabel(diff)
-                : (file.path.split('/').pop() ?? file.path)
+            : target.kind === 'todos'
+              ? 'Todos'
+              : target.kind === 'note'
+                ? notes.find((n) => n.id === target.noteId)?.title || 'Untitled note'
+                : diff
+                  ? diffTabLabel(diff)
+                  : (file.path.split('/').pop() ?? file.path)
         const state = fileStates[tabKey(file)]
         // Virtual tabs autosave and have no file state, so they are never dirty.
         const dirty = state?.kind === 'text' && state.current !== state.saved

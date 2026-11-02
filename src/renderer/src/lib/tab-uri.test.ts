@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { BOARD_TAB_PATH, NOTES_TAB_PATH, isVirtualTab, noteTabPath, parseTabPath } from './tab-uri'
+import {
+  BOARD_TAB_PATH,
+  NOTES_TAB_PATH,
+  TODOS_TAB_PATH,
+  isVirtualTab,
+  noteTabPath,
+  parseTabPath,
+} from './tab-uri'
 
 describe('parseTabPath', () => {
+  it('recognises the todos tab as virtual, so it never reads from disk', () => {
+    expect(parseTabPath(TODOS_TAB_PATH)).toEqual({ kind: 'todos' })
+    expect(isVirtualTab(TODOS_TAB_PATH)).toBe(true)
+  })
+
   it('recognises the board tab', () => {
     expect(parseTabPath(BOARD_TAB_PATH)).toEqual({ kind: 'board' })
   })

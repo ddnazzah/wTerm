@@ -22,7 +22,7 @@ import { useProjects } from './hooks/use-projects'
 import { useWindowZoom } from './lib/zoom'
 import { closeProjectTerminal, createProjectTerminal, useWorkspace } from '@renderer/state/store'
 import { useGithub } from './state/github'
-import { BOARD_TAB_PATH, NOTES_TAB_PATH } from '@renderer/lib/tab-uri'
+import { BOARD_TAB_PATH, NOTES_TAB_PATH, TODOS_TAB_PATH } from '@renderer/lib/tab-uri'
 import { stripSpinner } from '@shared/terminal-title'
 import { HOME_PROJECT_ID, type ActivityStatus, type Project, type TerminalRecord } from '@shared/types'
 
@@ -80,6 +80,10 @@ export default function App() {
   }, [selectedProject, openFile])
   const openNotes = useCallback(() => {
     if (selectedProject) openFile({ projectId: selectedProject.id, path: NOTES_TAB_PATH })
+  }, [selectedProject, openFile])
+  // Todos span every project, but a tab still has to live in one; Home always exists.
+  const openTodos = useCallback(() => {
+    openFile({ projectId: selectedProject?.id ?? HOME_PROJECT_ID, path: TODOS_TAB_PATH })
   }, [selectedProject, openFile])
 
   const pendingFocusRef = useRef<{ projectId: string; terminalId: string } | null>(null)
@@ -350,6 +354,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenBoard={openBoard}
         onOpenNotes={openNotes}
+        onOpenTodos={openTodos}
         projectActionsDisabled={!selectedProject}
       />
       <div className="flex flex-1 min-h-0 gap-1.5 py-1.5">

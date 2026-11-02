@@ -10,12 +10,14 @@ export const TAB_SCHEME = 'wterm://'
 export const BOARD_TAB_PATH = `${TAB_SCHEME}board`
 /** The notes tab with nothing selected yet — the list view. */
 export const NOTES_TAB_PATH = `${TAB_SCHEME}notes`
+export const TODOS_TAB_PATH = `${TAB_SCHEME}todos`
 
 const NOTE_PREFIX = `${TAB_SCHEME}note/`
 
 export type TabTarget =
   | { kind: 'file'; path: string }
   | { kind: 'board' }
+  | { kind: 'todos' }
   | { kind: 'note'; noteId: string | null }
 
 export function noteTabPath(noteId: string): string {
@@ -25,6 +27,7 @@ export function noteTabPath(noteId: string): string {
 /** Classify an open tab's path. Anything unrecognised is a plain file. */
 export function parseTabPath(path: string): TabTarget {
   if (path === BOARD_TAB_PATH) return { kind: 'board' }
+  if (path === TODOS_TAB_PATH) return { kind: 'todos' }
   if (path === NOTES_TAB_PATH) return { kind: 'note', noteId: null }
   if (path.startsWith(NOTE_PREFIX)) {
     const noteId = path.slice(NOTE_PREFIX.length)

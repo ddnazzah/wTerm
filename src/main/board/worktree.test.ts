@@ -2,11 +2,17 @@
 // likely to be wrong in a way unit tests can't see.
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { allocateWorktree, excludeFromGitStatus, isWorktreeDirty, pruneWorktree } from './worktree'
+import {
+  allocateWorktree,
+  excludeFromGitStatus,
+  isWorktreeDirty,
+  mainRepoPath,
+  pruneWorktree,
+} from './worktree'
 
 let root: string
 let repo: string
@@ -15,6 +21,27 @@ function git(args: string[], cwd: string): void {
   const res = spawnSync('git', args, { cwd, encoding: 'utf-8' })
   if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`)
 }
+
+describe('mainRepoPath', () => {
+  // realpath: macOS tmpdir is a symlink, and git reports the resolved path.
+  it('returns the checkout itself from a plain repo', async () => {
+    expect(await mainRepoPath(repo)).toBe(realpathSync(repo))
+  })
+
+  it('returns the main checkout from a linked worktree outside it', async () => {
+    const linked = join(root, 'linked')
+    git(['worktree', 'add', '-b', 'side', linked], repo)
+    expect(await mainRepoPath(linked)).toBe(realpathSync(repo))
+  })
+
+  it('returns null for a folder that is not in a repo', async () => {
+    expect(await mainRepoPath(root)).toBeNull()
+  })
+
+  it('returns null for a folder that no longer exists', async () => {
+    expect(await mainRepoPath(join(root, 'gone'))).toBeNull()
+  })
+})
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'wterm-board-'))
