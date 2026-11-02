@@ -3,11 +3,28 @@ import { isWindows, kbd } from '@renderer/lib/platform'
 
 interface Props {
   onOpenSettings: () => void
-  /** When true, panel-bound icons (files/git) are disabled — there's no project to inspect. */
+  /** Open the project board tab; disabled when no project is selected. */
+  onOpenBoard: () => void
+  /** Open the project notes tab; disabled when no project is selected. */
+  onOpenNotes: () => void
+  /** Open the todos tab, which covers every project, so it is never disabled. */
+  onOpenTodos: () => void
+  /** Whether the Home terminal dock is open (drives the button's active state). */
+  terminalOpen: boolean
+  onToggleTerminal: () => void
+  /** When true, project-bound icons (files, git, board, notes) are disabled — there's no project to inspect. */
   panelDisabled?: boolean
 }
 
-export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Props) {
+export function RightActivityBar({
+  onOpenSettings,
+  onOpenBoard,
+  onOpenNotes,
+  onOpenTodos,
+  terminalOpen,
+  onToggleTerminal,
+  panelDisabled = false,
+}: Props) {
   const tab = useWorkspace((s) => s.rightSidebarTab)
   const setTab = useWorkspace((s) => s.setRightSidebarTab)
   const collapsed = useWorkspace((s) => s.rightSidebarCollapsed)
@@ -32,7 +49,7 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
 
   return (
     <aside
-      className={`app-titlebar flex flex-col items-center justify-between gap-1 py-2 ${
+      className={`app-titlebar relative z-50 flex flex-col items-center justify-between gap-1 py-2 ${
         isWindows ? 'pt-12' : ''
       } w-11 flex-shrink-0 bg-surface`}
     >
@@ -71,6 +88,36 @@ export function RightActivityBar({ onOpenSettings, panelDisabled = false }: Prop
             <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </ActivityButton>
+
+        <span aria-hidden className="w-5 h-px my-1 bg-foreground/15" />
+
+        <ActivityButton disabled={panelDisabled} onClick={onOpenBoard} label="Board">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="3" y="4" width="5" height="16" rx="1" />
+            <rect x="10" y="4" width="5" height="10" rx="1" />
+            <rect x="17" y="4" width="4" height="13" rx="1" />
+          </svg>
+        </ActivityButton>
+        <ActivityButton disabled={panelDisabled} onClick={onOpenNotes} label="Notes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M5 3h11l4 4v14H5z" />
+            <line x1="9" y1="9" x2="15" y2="9" />
+            <line x1="9" y1="13" x2="15" y2="13" />
+            <line x1="9" y1="17" x2="13" y2="17" />
+          </svg>
+        </ActivityButton>
+        <ActivityButton onClick={onOpenTodos} label="Todos">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9 11l3 3 8-8" />
+            <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
+          </svg>
+        </ActivityButton>
+        <ActivityButton active={terminalOpen} onClick={onToggleTerminal} label={`Terminal (${kbd('J')})`}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
+          </svg>
+        </ActivityButton>
       </div>
 
       <div className="flex flex-col items-center gap-1">
@@ -105,9 +152,8 @@ function ActivityButton({
       disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      title={label}
       className={[
-        'relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
+        'group/activity relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
         disabled
           ? 'text-foreground/20 cursor-not-allowed'
           : active
@@ -116,6 +162,13 @@ function ActivityButton({
       ].join(' ')}
     >
       {children}
+      {/* The bar sits on the window's right edge, so the name opens to the left. */}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 rounded-md whitespace-nowrap text-[11px] text-foreground bg-surface border border-accent/14 shadow-md opacity-0 transition-opacity group-hover/activity:opacity-100 group-focus-visible/activity:opacity-100"
+      >
+        {label}
+      </span>
       {active && (
         <span
           aria-hidden

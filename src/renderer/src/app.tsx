@@ -349,13 +349,7 @@ export default function App() {
           if (selectedProject) void createProjectTerminal(selectedProject.id)
         }}
         newSessionDisabled={!selectedProject}
-        terminalOpen={bottomPanelOpen}
-        onToggleTerminal={toggleHomeTerminal}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenBoard={openBoard}
-        onOpenNotes={openNotes}
-        onOpenTodos={openTodos}
-        projectActionsDisabled={!selectedProject}
       />
       <div className="flex flex-1 min-h-0 gap-1.5 py-1.5">
         {!sidebarCollapsed && <ProjectList />}
@@ -380,6 +374,11 @@ export default function App() {
         </div>
         <RightActivityBar
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenBoard={openBoard}
+          onOpenNotes={openNotes}
+          onOpenTodos={openTodos}
+          terminalOpen={bottomPanelOpen}
+          onToggleTerminal={toggleHomeTerminal}
           panelDisabled={!selectedProject}
         />
       </div>
