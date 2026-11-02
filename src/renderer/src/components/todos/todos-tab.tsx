@@ -3,7 +3,7 @@ import type { Todo, TodosSnapshot } from '@shared/types'
 import { findProjectForPath, planSessionOpen } from '@shared/todo-session'
 import { HOME_PROJECT_ID } from '@shared/types'
 import { TODOS_TAB_PATH } from '@renderer/lib/tab-uri'
-import { collectorWarning, groupTodos, projectLabel } from '@renderer/lib/todo-view'
+import { collectorWarning, coversTerminal, groupTodos, projectLabel } from '@renderer/lib/todo-view'
 import { useSettings } from '@renderer/state/settings'
 import { useWorkspace } from '@renderer/state/store'
 
@@ -46,6 +46,9 @@ async function openSession(todo: Todo): Promise<string | null> {
   workspace.openFiles
     .filter((file) => file.path === TODOS_TAB_PATH)
     .forEach((file) => workspace.closeFile(file))
+  if (coversTerminal(workspace.openFiles, plan.projectId, workspace.editorViewMode)) {
+    workspace.setEditorViewMode('docked')
+  }
 
   if (plan.kind === 'focus') {
     workspace.setActiveTerminal(plan.projectId, plan.terminalId)
@@ -99,34 +102,37 @@ function TodoRow({ todo, onError }: RowProps) {
         aria-label={isDone ? `Reopen ${todo.title}` : `Mark ${todo.title} done`}
         className="mt-0.5 flex-shrink-0 accent-accent"
       />
-      <div className="flex-1 min-w-0">
-        <div className={`text-[13px] leading-snug ${isDone ? 'line-through text-foreground/45' : 'text-foreground/90'}`}>
-          {todo.title}
+      {/* Actions sit beside the text when there is room and wrap below it when docked. */}
+      <div className="flex-1 min-w-0 flex flex-wrap items-start gap-x-2.5 gap-y-1">
+        <div className="flex-1 min-w-[220px]">
+          <div className={`text-[13px] leading-snug ${isDone ? 'line-through text-foreground/45' : 'text-foreground/90'}`}>
+            {todo.title}
+          </div>
+          {todo.detail && !isDone && (
+            <div className="mt-0.5 text-[12px] leading-snug text-foreground/55">{todo.detail}</div>
+          )}
+          <div className="mt-1 flex gap-1.5 text-[11px] font-mono text-foreground/35">
+            <span className="truncate">
+              {label}
+              {todo.branch ? ` · ${todo.branch}` : ''}
+            </span>
+            {todo.card && <span className="flex-shrink-0">· on board #{todo.card.number}</span>}
+          </div>
         </div>
-        {todo.detail && !isDone && (
-          <div className="mt-0.5 text-[12px] leading-snug text-foreground/55">{todo.detail}</div>
+        {!isDone && (
+          <div className="flex items-center gap-0.5 flex-shrink-0 -ml-1.5">
+            <button type="button" className={ROW_BUTTON} onClick={open}>
+              Open session
+            </button>
+            <button type="button" className={ROW_BUTTON} onClick={send} disabled={Boolean(todo.card)}>
+              Send to board
+            </button>
+            <button type="button" className={ROW_BUTTON} onClick={() => setStatus('dismissed')}>
+              Dismiss
+            </button>
+          </div>
         )}
-        <div className="mt-1 flex gap-1.5 text-[11px] font-mono text-foreground/35">
-          <span className="truncate">
-            {label}
-            {todo.branch ? ` · ${todo.branch}` : ''}
-          </span>
-          {todo.card && <span className="flex-shrink-0">· on board #{todo.card.number}</span>}
-        </div>
       </div>
-      {!isDone && (
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button type="button" className={ROW_BUTTON} onClick={open}>
-            Open session
-          </button>
-          <button type="button" className={ROW_BUTTON} onClick={send} disabled={Boolean(todo.card)}>
-            Send to board
-          </button>
-          <button type="button" className={ROW_BUTTON} onClick={() => setStatus('dismissed')}>
-            Dismiss
-          </button>
-        </div>
-      )}
     </li>
   )
 }

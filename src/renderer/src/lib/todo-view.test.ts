@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import type { CollectorStatus, Todo } from '@shared/types'
-import { STALE_AFTER_MS, collectorWarning, effectiveBucket, groupTodos, projectLabel } from './todo-view'
+import { TODOS_TAB_PATH } from './tab-uri'
+import {
+  STALE_AFTER_MS,
+  collectorWarning,
+  coversTerminal,
+  effectiveBucket,
+  groupTodos,
+  projectLabel,
+} from './todo-view'
 
 const at = (iso: string): Date => new Date(iso)
 
@@ -59,6 +67,28 @@ describe('groupTodos', () => {
     )
     expect(groups.done.map((t) => t.id)).toEqual(['d'])
     expect(groups.now).toEqual([])
+  })
+})
+
+describe('coversTerminal', () => {
+  const todos = { projectId: 'p1', path: TODOS_TAB_PATH }
+  const board = { projectId: 'p1', path: 'wterm://board' }
+
+  test('is false when Todos is the only tab, since closing it clears the panel', () => {
+    expect(coversTerminal([todos], 'p1', 'floating')).toBe(false)
+  })
+
+  test('is true when another tab in the project would keep the panel up', () => {
+    expect(coversTerminal([todos, board], 'p1', 'floating')).toBe(true)
+    expect(coversTerminal([todos, board], 'p1', 'fullscreen')).toBe(true)
+  })
+
+  test('ignores tabs in other projects', () => {
+    expect(coversTerminal([{ ...board, projectId: 'p2' }], 'p1', 'floating')).toBe(false)
+  })
+
+  test('is false in the docked view, which shows the terminal alongside', () => {
+    expect(coversTerminal([todos, board], 'p1', 'docked')).toBe(false)
   })
 })
 
