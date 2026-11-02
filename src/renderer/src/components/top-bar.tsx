@@ -7,36 +7,20 @@ interface Props {
   onToggleSidebar: () => void
   onNewSession: () => void
   newSessionDisabled?: boolean
-  /** Whether the Home terminal dock is open (drives the trigger's active state). */
-  terminalOpen: boolean
-  onToggleTerminal: () => void
   onOpenSettings: () => void
-  /** Open the project board tab; disabled when no project is selected. */
-  onOpenBoard: () => void
-  /** Open the project notes tab; disabled when no project is selected. */
-  onOpenNotes: () => void
-  /** Open the todos tab, which covers every project. */
-  onOpenTodos: () => void
-  projectActionsDisabled?: boolean
 }
 
 /**
  * Full-width top bar. Left: sidebar toggle. Center: a search-like input showing
- * the current session with a New action. Right: the Home-terminal trigger and
- * the GitHub profile.
+ * the current session with a New action. Right: the GitHub profile. Everything
+ * else lives in the activity bar.
  */
 export function TopBar({
   label,
   onToggleSidebar,
   onNewSession,
   newSessionDisabled = false,
-  terminalOpen,
-  onToggleTerminal,
   onOpenSettings,
-  onOpenBoard,
-  onOpenNotes,
-  onOpenTodos,
-  projectActionsDisabled = false,
 }: Props) {
   return (
     <header
@@ -88,69 +72,6 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-1 flex-shrink-0">
-        <button
-          type="button"
-          onClick={onOpenBoard}
-          disabled={projectActionsDisabled}
-          aria-label="Open board"
-          title="Project board"
-          className="flex items-center justify-center w-7 h-7 rounded-md text-foreground/55 hover:text-foreground hover:bg-foreground/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="3" y="4" width="5" height="16" rx="1" />
-            <rect x="10" y="4" width="5" height="10" rx="1" />
-            <rect x="17" y="4" width="4" height="13" rx="1" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenNotes}
-          disabled={projectActionsDisabled}
-          aria-label="Open notes"
-          title="Notes"
-          className="flex items-center justify-center w-7 h-7 rounded-md text-foreground/55 hover:text-foreground hover:bg-foreground/10 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M5 3h11l4 4v14H5z" />
-            <line x1="9" y1="9" x2="15" y2="9" />
-            <line x1="9" y1="13" x2="15" y2="13" />
-            <line x1="9" y1="17" x2="13" y2="17" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpenTodos}
-          aria-label="Open todos"
-          title="Todos"
-          className="flex items-center justify-center w-7 h-7 rounded-md text-foreground/55 hover:text-foreground hover:bg-foreground/10 transition-colors"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M9 11l3 3 8-8" />
-            <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onToggleTerminal}
-          aria-label="Toggle terminal"
-          aria-pressed={terminalOpen}
-          title="Terminal (⌘J)"
-          className={[
-            'flex items-center justify-center w-7 h-7 rounded-md transition-colors',
-            terminalOpen
-              ? 'text-foreground bg-foreground/10'
-              : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
-          ].join(' ')}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <polyline points="4 17 10 11 4 5" />
-            <line x1="12" y1="19" x2="20" y2="19" />
-          </svg>
-        </button>
-
         <ProfileMenu onOpenSettings={onOpenSettings} />
       </div>
     </header>
