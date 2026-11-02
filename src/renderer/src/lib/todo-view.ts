@@ -1,6 +1,7 @@
 // Display rules for the Todos tab. Pure so they can be tested without rendering.
 
 import type { CollectorStatus, Todo, TodoBucket } from '@shared/types'
+import { TODOS_TAB_PATH } from './tab-uri'
 
 /** The collector runs every 30 minutes, so this is several missed runs. */
 export const STALE_AFTER_MS = 3 * 60 * 60 * 1000
@@ -37,6 +38,19 @@ export function groupTodos(todos: Todo[], now: Date): TodoGroups {
     future: inBucket('future'),
     done: todos.filter((t) => t.status === 'done').sort(byNewest),
   }
+}
+
+/**
+ * Would the project's other tabs still hide its terminal once Todos closes? Only the
+ * docked view shows the two side by side, and it keeps those tabs open.
+ */
+export function coversTerminal(
+  openFiles: { projectId: string; path: string }[],
+  projectId: string,
+  viewMode: string
+): boolean {
+  if (viewMode === 'docked') return false
+  return openFiles.some((file) => file.projectId === projectId && file.path !== TODOS_TAB_PATH)
 }
 
 export function projectLabel(cwd: string): string {
