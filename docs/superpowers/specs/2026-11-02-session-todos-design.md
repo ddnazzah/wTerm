@@ -32,6 +32,9 @@ Everything lives in `<userData>/session-todos/`:
   todos stored there would reach the phone. Phone support is out of scope.
 - **Todos appear immediately.** There is no approval queue; the user dismisses
   wrong ones. Dismissed and done todos are never reopened by a later import.
+- **A due date decides the bucket.** A todo with a `dueDate` sits in Future until the
+  day before, Tomorrow that day, and Now from the day itself. Tomorrow and Future
+  otherwise just mean later.
 - **Tomorrow rolls over.** A `tomorrow` todo shows under Now from the local day
   after it was created. This is derived at display time, not stored.
 - **Sessions can close their own todos.** The collector tells the model which

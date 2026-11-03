@@ -25,7 +25,7 @@ async function resolveProjectId(cwd: string): Promise<ProjectId | undefined> {
 }
 
 function cardBody(todo: Todo): string {
-  return [todo.detail, `From Claude session \`${todo.sessionId}\` in \`${todo.cwd}\`.`]
+  return [todo.detail, todo.dueDate && `Due ${todo.dueDate}.`, `From Claude session \`${todo.sessionId}\` in \`${todo.cwd}\`.`]
     .filter(Boolean)
     .join('\n\n')
 }

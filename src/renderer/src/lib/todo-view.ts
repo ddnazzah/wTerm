@@ -19,8 +19,26 @@ function startOfLocalDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
-/** A Tomorrow todo becomes Now once the local day it was created on has passed. */
+function dayKey(date: Date): string {
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function nextDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
+}
+
+function bucketForDate(dueDate: string, now: Date): TodoBucket {
+  if (dueDate <= dayKey(now)) return 'now'
+  return dueDate === dayKey(nextDay(now)) ? 'tomorrow' : 'future'
+}
+
+/**
+ * A due date decides where a todo sits, so it moves up by itself as the day nears.
+ * Without one, a Tomorrow todo becomes Now once the day it was created on has passed.
+ */
 export function effectiveBucket(todo: Todo, now: Date): TodoBucket {
+  if (todo.dueDate) return bucketForDate(todo.dueDate, now)
   if (todo.bucket !== 'tomorrow') return todo.bucket
   const isLaterDay = startOfLocalDay(now) > startOfLocalDay(new Date(todo.createdAt))
   return isLaterDay ? 'now' : 'tomorrow'
@@ -28,10 +46,34 @@ export function effectiveBucket(todo: Todo, now: Date): TodoBucket {
 
 const byNewest = (a: Todo, b: Todo): number => b.createdAt.localeCompare(a.createdAt)
 
+/** Soonest date first, then undated todos, newest first. */
+function byDueThenNewest(a: Todo, b: Todo): number {
+  if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate) || byNewest(a, b)
+  if (a.dueDate) return -1
+  if (b.dueDate) return 1
+  return byNewest(a, b)
+}
+
+/** How a due date reads on a row: Overdue, today, tomorrow, or the date itself. */
+export function dueLabel(dueDate: string, now: Date): string {
+  const today = dayKey(now)
+  if (dueDate === today) return 'Due today'
+  if (dueDate === dayKey(nextDay(now))) return 'Due tomorrow'
+  const [year, month, day] = dueDate.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    ...(year === now.getFullYear() ? {} : { year: 'numeric' }),
+  }
+  const text = date.toLocaleDateString('en-US', options)
+  return dueDate < today ? `Overdue, ${text}` : `Due ${text}`
+}
+
 export function groupTodos(todos: Todo[], now: Date): TodoGroups {
   const open = todos.filter((t) => t.status === 'open')
   const inBucket = (bucket: TodoBucket): Todo[] =>
-    open.filter((t) => effectiveBucket(t, now) === bucket).sort(byNewest)
+    open.filter((t) => effectiveBucket(t, now) === bucket).sort(byDueThenNewest)
   return {
     now: inBucket('now'),
     tomorrow: inBucket('tomorrow'),

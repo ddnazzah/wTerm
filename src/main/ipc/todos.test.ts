@@ -55,6 +55,14 @@ describe('todos sendToBoard', () => {
     expect(mocks.createCard).toHaveBeenCalledTimes(1)
   })
 
+  test('carries the due date onto the card', async () => {
+    const { send } = register({ ...todo, dueDate: '2026-11-10' })
+    await send()
+    expect(mocks.createCard).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining('Due 2026-11-10.') })
+    )
+  })
+
   test('always files the card in Backlog', async () => {
     const { send } = register(todo)
     await send()

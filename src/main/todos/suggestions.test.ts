@@ -33,6 +33,19 @@ const openTodo = (overrides: Partial<Todo> = {}): Todo => ({
   ...overrides,
 })
 
+describe('parseSuggestions due dates', () => {
+  test('keeps a real date', () => {
+    const [event] = parseSuggestions(line(addEvent({ dueDate: '2026-11-10' })))
+    expect(event).toMatchObject({ todo: { dueDate: '2026-11-10' } })
+  })
+
+  test.each([['2026-02-31'], ['next week'], [20261110], [null]])('keeps the todo without the date %s', (dueDate) => {
+    const [event] = parseSuggestions(line(addEvent({ dueDate })))
+    expect(event).toBeDefined()
+    expect(event).not.toHaveProperty('todo.dueDate')
+  })
+})
+
 describe('parseSuggestions', () => {
   test('parses add and resolve events', () => {
     const events = parseSuggestions(line(addEvent()) + line({ type: 'resolve', id: 'bbbbbbbbbbbbbbbb' }))
