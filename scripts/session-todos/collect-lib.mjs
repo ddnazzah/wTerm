@@ -262,22 +262,35 @@ function needsAttentionNow({ bucket, dueDate }, today) {
   return dueDate ? dueDate <= today : bucket === 'now'
 }
 
+/**
+ * Sessions often discuss one job, and each would otherwise raise its own copy. A shared
+ * title alone is not enough: "Approve PR" in two repos is two jobs, and dropping one
+ * would lose it for good. So it must also share a folder or a due day.
+ */
+function isSameJob(a, b) {
+  if (normalizeTitle(a.title) !== normalizeTitle(b.title)) return false
+  return a.cwd === b.cwd || (Boolean(a.dueDate) && a.dueDate === b.dueDate)
+}
+
 /** Turn validated output into suggestion events plus the next tracked map. */
 export function buildEvents({ adds, resolved }, digests, tracked, nowIso) {
   const bySession = new Map(digests.map((d) => [d.sessionId, d]))
   const nextTracked = { ...tracked }
   const addEvents = []
-  // Sessions often discuss the same job, and each would otherwise raise its own copy.
-  const seenTitles = new Set(Object.values(tracked).map((todo) => normalizeTitle(todo.title)))
+  const stillOpen = Object.entries(tracked)
+    .filter(([id]) => !resolved.includes(id))
+    .map(([, todo]) => todo)
 
   for (const add of adds) {
-    const normalized = normalizeTitle(add.title)
-    if (seenTitles.has(normalized)) continue
-    seenTitles.add(normalized)
     const id = todoId(add.sessionId, add.title)
+    if (nextTracked[id]) continue
     const { cwd, branch } = bySession.get(add.sessionId)
+    const dueDate = add.dueDate ? { dueDate: add.dueDate } : {}
+    const entry = { sessionId: add.sessionId, title: add.title, at: nowIso, cwd, ...dueDate }
+    if (stillOpen.some((todo) => isSameJob(todo, entry))) continue
+    stillOpen.push(entry)
     addEvents.push({ type: 'add', id, ...add, cwd, branch, createdAt: nowIso })
-    nextTracked[id] = { sessionId: add.sessionId, title: add.title, at: nowIso }
+    nextTracked[id] = entry
   }
   for (const id of resolved) delete nextTracked[id]
 
@@ -288,9 +301,15 @@ export function buildEvents({ adds, resolved }, digests, tracked, nowIso) {
   }
 }
 
-/** Forget old tracked todos so the prompt and state file stay bounded. */
+/**
+ * Forget old tracked todos so the prompt and state file stay bounded. One due later
+ * stays known until its day has passed, or a session raising it again would duplicate it.
+ */
 export function pruneTracked(tracked, nowMs) {
+  const today = localDate(new Date(nowMs))
   return Object.fromEntries(
-    Object.entries(tracked).filter(([, todo]) => nowMs - Date.parse(todo.at) < TRACKED_MAX_AGE_MS)
+    Object.entries(tracked).filter(
+      ([, todo]) => nowMs - Date.parse(todo.at) < TRACKED_MAX_AGE_MS || todo.dueDate >= today
+    )
   )
 }

@@ -147,8 +147,9 @@ app.whenReady().then(async () => {
 
   // Todos are collected outside the app, so this only imports what has arrived. A
   // failure here must not take the app down.
+  // On macOS the app keeps running with its window closed, and reminders must still sync.
   const sendTodosChanged = (): void => {
-    mainWindow?.webContents.send(IPC.todos.changed)
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.todos.changed)
   }
   const todosDir = join(app.getPath('userData'), 'session-todos')
   const todoStore = new TodoStore(todosDir)

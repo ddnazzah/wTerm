@@ -75,6 +75,12 @@ export function dueArgs(dueDate: string): string[] {
   return [year, month, day, ALERT_HOUR].map(String)
 }
 
+/** Node refuses an argument containing NUL, which would block every later reminder. */
+export function createArgs(listName: string, todo: Todo): string[] {
+  const text = [todo.title, reminderBody(todo)].map((value) => value.replaceAll('\0', ''))
+  return [listName, ...text, ...dueArgs(todo.dueDate ?? '')]
+}
+
 export function friendlyReminderError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err)
   if (message.includes(NOT_AUTHORIZED)) {
@@ -91,13 +97,7 @@ export function osascriptReminderClient(listName: string): ReminderClient {
     return stdout.trim()
   }
   return {
-    create: (todo) =>
-      osascript(CREATE_SCRIPT, [
-        listName,
-        todo.title,
-        reminderBody(todo),
-        ...dueArgs(todo.dueDate ?? ''),
-      ]),
+    create: (todo) => osascript(CREATE_SCRIPT, createArgs(listName, todo)),
     complete: async (reminderId) => {
       await osascript(COMPLETE_SCRIPT, [reminderId])
     },
@@ -138,7 +138,12 @@ export function createReminderSync(
     }
     if (nextError === lastError) return
     lastError = nextError
-    onErrorChanged()
+    // A rejected queue would silently skip every later pass.
+    try {
+      onErrorChanged()
+    } catch (err) {
+      console.error('[todos] reminder error listener failed:', err)
+    }
   }
 
   return {
