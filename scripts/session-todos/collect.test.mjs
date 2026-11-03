@@ -93,6 +93,64 @@ describe('collector run', () => {
     expect(status.lastSuccessAt).toBe(status.lastRunAt)
   })
 
+  test('records the folder resume needs, not the one the session moved to', async () => {
+    const line = (cwd, text) =>
+      JSON.stringify({
+        type: 'user',
+        cwd,
+        gitBranch: 'main',
+        timestamp: new Date().toISOString(),
+        message: { role: 'user', content: text },
+      }) + '\n'
+    const file = join(projectDir, `${SESSION}.jsonl`)
+    await fs.appendFile(file, line('/repo', 'start') + line('/repo/packages/web', 'moved'))
+    await replyWith({ add: [add], resolved: [] })
+
+    await collect()
+
+    expect((await readEvents())[0].cwd).toBe('/repo')
+  })
+
+  test('finds the resume folder at the head when new lines are all from elsewhere', async () => {
+    const line = (cwd, text) =>
+      JSON.stringify({
+        type: 'user',
+        cwd,
+        timestamp: new Date().toISOString(),
+        message: { role: 'user', content: text },
+      }) + '\n'
+    const file = join(projectDir, `${SESSION}.jsonl`)
+    await fs.appendFile(file, line('/repo', 'start'))
+    await replyWith({ add: [], resolved: [] })
+    await collect()
+
+    await fs.appendFile(file, line('/repo/packages/web', 'later'))
+    await replyWith({ add: [add], resolved: [] })
+    await collect()
+
+    expect((await readEvents())[0].cwd).toBe('/repo')
+  })
+
+  test('records the failure when claude exits without reading its prompt', async () => {
+    // Tracked titles grow the prompt past the pipe's buffer, so the write is still
+    // going when claude exits and breaks the pipe.
+    const at = new Date().toISOString()
+    const tracked = Object.fromEntries(
+      Array.from({ length: 3000 }, (_, index) => [
+        `id${index}`,
+        { sessionId: SESSION, title: 'y'.repeat(120), at },
+      ])
+    )
+    await fs.mkdir(dataDir, { recursive: true })
+    await fs.writeFile(join(dataDir, 'state.json'), JSON.stringify({ cursors: {}, tracked }))
+    await appendTranscript('hello')
+    await fs.writeFile(fakeClaude, '#!/bin/sh\necho "bad flag" >&2\nexit 3\n', { mode: 0o755 })
+
+    expect(await collect()).toBe(1)
+
+    expect((await readJson('status.json')).lastError).toContain('claude exited 3')
+  })
+
   test('runs the model with tools off and without saving a session', async () => {
     await appendTranscript('hello')
     await replyWith({ add: [], resolved: [] })

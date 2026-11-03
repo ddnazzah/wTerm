@@ -5,6 +5,9 @@ import {
   buildEvents,
   buildPrompt,
   digestSession,
+  findResumeCwd,
+  localDate,
+  transcriptDirName,
   packDigests,
   planRead,
   pruneTracked,
@@ -84,6 +87,37 @@ describe('sliceCompleteLines', () => {
   })
 })
 
+describe('findResumeCwd', () => {
+  const lines = (...cwds) => cwds.map((cwd) => JSON.stringify({ type: 'user', cwd })).join('\n')
+  const dir = transcriptDirName('/Users/me/app')
+
+  test('names the transcript folder the way Claude does', () => {
+    expect(transcriptDirName('/Users/me/app/.claude/worktrees/x_y')).toBe(
+      '-Users-me-app--claude-worktrees-x-y'
+    )
+  })
+
+  test('ignores later folders the session moved to', () => {
+    expect(findResumeCwd(lines('/Users/me/app', '/Users/me/app/src', '/tmp'), dir)).toBe('/Users/me/app')
+  })
+
+  test('returns null when no line is from the resume folder', () => {
+    expect(findResumeCwd(lines('/Users/me/app/src'), dir)).toBeNull()
+  })
+
+  test('tolerates partial lines and entries with no cwd', () => {
+    const text = `{"cwd":"/Users/me/ap\n{"type":"summary"}\n${lines('/Users/me/app')}`
+    expect(findResumeCwd(text, dir)).toBe('/Users/me/app')
+  })
+})
+
+describe('localDate', () => {
+  test('uses the local calendar day, not the UTC one', () => {
+    expect(localDate(new Date(2026, 10, 3, 23, 30))).toBe('2026-11-03')
+    expect(localDate(new Date(2026, 0, 5, 0, 30))).toBe('2026-01-05')
+  })
+})
+
 describe('redactSecrets', () => {
   test.each([
     ['anthropic key', 'key sk-ant-api03-abcdefghijklmnopqrstuvwx'],
@@ -92,10 +126,26 @@ describe('redactSecrets', () => {
     ['bearer header', 'Authorization: Bearer abc.def.ghi-jkl'],
     ['assignment', 'PASSWORD=hunter2hunter2'],
     ['json field', '"api_key": "abcd1234efgh"'],
+    ['quoted password with spaces', 'password="abcd1234 hunter2 abcdefghijkl"'],
+    ['colon password with spaces', 'password: "abcd1234 hunter2"'],
+    ['single quoted secret', "secret = 'abcd1234 hunter2'"],
+    ['database url', 'postgres://admin:hunter2@db.example.com:5432/app'],
+    ['slack token', 'xoxb-abcdefghijkl-1234567890'],
+    ['google key', 'AIzaabcdefghijklmnopqrstuvwxyz012345678'],
+    ['jwt', 'eyJabcdefghijkl.eyJabcdefghijkl.abcdefghijkl'],
   ])('removes %s', (_name, input) => {
     const out = redactSecrets(input)
     expect(out).toContain('[redacted]')
     expect(out).not.toMatch(/abcdefghijkl|AKIAABCD|abc\.def|hunter2|abcd1234/)
+  })
+
+  test('keeps the words around a quoted secret', () => {
+    expect(redactSecrets('set password="a b c" then deploy')).toBe('set [redacted] then deploy')
+  })
+
+  test('leaves a url without credentials alone', () => {
+    const url = 'see https://example.com:8080/docs and postgres://db.example.com/app'
+    expect(redactSecrets(url)).toBe(url)
   })
 
   test('removes a whole private key block', () => {

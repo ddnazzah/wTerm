@@ -62,6 +62,7 @@ function planTerminal(
     const flagsSource = isClaudeLaunch(captured) ? captured : settings.startupCommand
     return {
       ...base,
+      cwd: terminal.resumeCwd ?? base.cwd,
       resumeSessionId: terminal.claudeSessionId,
       startupCommand: buildResumeCommand(flagsSource, terminal.claudeSessionId),
     }

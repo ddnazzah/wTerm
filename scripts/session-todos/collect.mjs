@@ -7,7 +7,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import {
   MAX_READ_BYTES,
   RESULT_SCHEMA,
@@ -20,6 +20,8 @@ import {
   pruneTracked,
   sliceCompleteLines,
   validateResult,
+  findResumeCwd,
+  localDate,
 } from './collect-lib.mjs'
 
 const DATA_DIR =
@@ -36,6 +38,7 @@ const MODEL = 'haiku'
 const CLAUDE_TIMEOUT_MS = 3 * 60 * 1000
 const FIRST_SEEN_LOOKBACK_MS = 24 * 60 * 60 * 1000
 const MAX_ERROR_CHARS = 300
+const HEAD_BYTES = 256 * 1024
 const SESSION_FILE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/
 
 async function readJson(path, fallback) {
@@ -67,6 +70,22 @@ async function listTranscripts() {
   return perDir.flat()
 }
 
+async function readHead(path) {
+  const handle = await fs.open(path, 'r')
+  try {
+    const { buffer, bytesRead } = await handle.read({ buffer: Buffer.alloc(HEAD_BYTES) })
+    return buffer.subarray(0, bytesRead).toString('utf-8')
+  } finally {
+    await handle.close()
+  }
+}
+
+/** Unread lines may all be from a later folder, so fall back to how the session began. */
+async function resumeFolder(path, text, latestCwd) {
+  const dirName = basename(dirname(path))
+  return findResumeCwd(text, dirName) ?? findResumeCwd(await readHead(path), dirName) ?? latestCwd
+}
+
 async function readDelta(path, size, cursor) {
   const { start, truncated } = planRead({ size, cursor, maxBytes: MAX_READ_BYTES })
   const handle = await fs.open(path, 'r')
@@ -89,7 +108,10 @@ async function scanTranscript(path, cursors, nowMs) {
     return { path, cursor: size, digest: null }
   }
   const { text, nextCursor } = await readDelta(path, size, cursor ?? 0)
-  return { path, cursor: nextCursor, digest: digestSession(basename(path, '.jsonl'), text) }
+  const digest = digestSession(basename(path, '.jsonl'), text)
+  if (!digest) return { path, cursor: nextCursor, digest }
+  const cwd = await resumeFolder(path, text, digest.cwd)
+  return { path, cursor: nextCursor, digest: { ...digest, cwd } }
 }
 
 function claudeArgs() {
@@ -122,11 +144,16 @@ function runClaude(prompt) {
     })
     let stdout = ''
     let stderr = ''
+    let stdinError = null
+    // A CLI that exits before reading its prompt breaks this pipe. Without a listener
+    // that kills the run before status.json can record why.
+    child.stdin.on('error', (err) => (stdinError = err))
     child.stdout.on('data', (chunk) => (stdout += chunk))
     child.stderr.on('data', (chunk) => (stderr += chunk))
     child.on('error', reject)
     child.on('close', (code) => {
       if (code !== 0) reject(new Error(`claude exited ${code}: ${stderr || stdout}`))
+      else if (stdinError) reject(stdinError)
       else resolve(stdout)
     })
     child.stdin.end(prompt)
@@ -150,7 +177,7 @@ async function appendEvents(events) {
 
 /** Ask the model about included digests. Returns the tracked map to persist. */
 async function extractTodos(included, tracked, nowIso) {
-  const prompt = buildPrompt(included, tracked, nowIso.slice(0, 10))
+  const prompt = buildPrompt(included, tracked, localDate(new Date(nowIso)))
   const validated = validateResult(await runClaude(prompt), included, tracked)
   const result = buildEvents(validated, included, tracked, nowIso)
   await appendEvents(result.events)

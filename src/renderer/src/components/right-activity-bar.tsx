@@ -1,3 +1,5 @@
+import { useState, type FocusEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useWorkspace, type RightSidebarTab } from '@renderer/state/store'
 import { isWindows, kbd } from '@renderer/lib/platform'
 
@@ -49,7 +51,7 @@ export function RightActivityBar({
 
   return (
     <aside
-      className={`app-titlebar relative z-50 flex flex-col items-center justify-between gap-1 py-2 ${
+      className={`app-titlebar flex flex-col items-center justify-between gap-1 py-2 ${
         isWindows ? 'pt-12' : ''
       } w-11 flex-shrink-0 bg-surface`}
     >
@@ -132,6 +134,38 @@ export function RightActivityBar({
   )
 }
 
+const TOOLTIP_GAP_PX = 8
+
+interface TooltipAnchor {
+  right: number
+  top: number
+}
+
+function anchorFor(element: Element): TooltipAnchor {
+  const box = element.getBoundingClientRect()
+  return {
+    right: document.documentElement.clientWidth - box.left + TOOLTIP_GAP_PX,
+    top: box.top + box.height / 2,
+  }
+}
+
+/**
+ * Rendered on the body because it opens over the editor overlay. Raising the bar to
+ * clear that overlay would also put the bar above the menus that overlap it.
+ */
+function ActivityTooltip({ label, anchor }: { label: string; anchor: TooltipAnchor }) {
+  return createPortal(
+    <span
+      role="tooltip"
+      style={{ right: anchor.right, top: anchor.top }}
+      className="pointer-events-none fixed z-[60] -translate-y-1/2 px-2 py-1 rounded-md whitespace-nowrap text-[11px] text-foreground bg-surface border border-accent/14 shadow-md"
+    >
+      {label}
+    </span>,
+    document.body
+  )
+}
+
 function ActivityButton({
   active = false,
   disabled = false,
@@ -145,36 +179,44 @@ function ActivityButton({
   label: string
   children: React.ReactNode
 }) {
+  const [anchor, setAnchor] = useState<TooltipAnchor | null>(null)
+  const onFocus = (event: FocusEvent<HTMLElement>): void => {
+    if (event.target.matches(':focus-visible')) setAnchor(anchorFor(event.currentTarget))
+  }
+
+  // The handlers sit on a wrapper because React drops mouse events on a disabled button.
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      aria-pressed={active}
-      className={[
-        'group/activity relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
-        disabled
-          ? 'text-foreground/20 cursor-not-allowed'
-          : active
-            ? 'text-foreground bg-foreground/10'
-            : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
-      ].join(' ')}
+    <span
+      className="flex"
+      onMouseEnter={(event) => setAnchor(anchorFor(event.currentTarget))}
+      onMouseLeave={() => setAnchor(null)}
+      onFocus={onFocus}
+      onBlur={() => setAnchor(null)}
     >
-      {children}
-      {/* The bar sits on the window's right edge, so the name opens to the left. */}
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute right-full top-1/2 -translate-y-1/2 mr-2 px-2 py-1 rounded-md whitespace-nowrap text-[11px] text-foreground bg-surface border border-accent/14 shadow-md opacity-0 transition-opacity group-hover/activity:opacity-100 group-focus-visible/activity:opacity-100"
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        aria-pressed={active}
+        className={[
+          'relative flex items-center justify-center w-9 h-9 rounded-md transition-colors',
+          disabled
+            ? 'text-foreground/20 cursor-not-allowed'
+            : active
+              ? 'text-foreground bg-foreground/10'
+              : 'text-foreground/55 hover:text-foreground hover:bg-foreground/10',
+        ].join(' ')}
       >
-        {label}
-      </span>
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-r bg-foreground"
-        />
-      )}
-    </button>
+        {children}
+        {active && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-r bg-foreground"
+          />
+        )}
+      </button>
+      {anchor && <ActivityTooltip label={label} anchor={anchor} />}
+    </span>
   )
 }

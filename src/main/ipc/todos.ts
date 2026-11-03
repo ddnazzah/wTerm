@@ -72,12 +72,23 @@ export function registerTodosIpc(
     if (await store.setStatus(id, status)) notifyChanged()
   })
 
-  ipcMain.handle(IPC.todos.sendToBoard, async (_e, id: string): Promise<SendTodoResult> => {
+  const send = async (id: string): Promise<SendTodoResult> => {
     const todo = store.get(id)
     if (!todo) return { ok: false, error: 'That todo no longer exists' }
     const result = await sendToBoard(store, todo, notifyBoardChanged)
     if (result.ok) notifyChanged()
     return result
+  }
+
+  // The button only disables once the new snapshot arrives, so a double-click lands
+  // here twice. Both share one send, or each would see no card yet and create one.
+  const sending = new Map<string, Promise<SendTodoResult>>()
+  ipcMain.handle(IPC.todos.sendToBoard, (_e, id: string): Promise<SendTodoResult> => {
+    const inFlight = sending.get(id)
+    if (inFlight) return inFlight
+    const started = send(id).finally(() => sending.delete(id))
+    sending.set(id, started)
+    return started
   })
 
   ipcMain.handle(IPC.todos.folderExists, (_e, id: string): Promise<boolean> => {

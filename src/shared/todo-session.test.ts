@@ -38,8 +38,33 @@ describe('findProjectForPath', () => {
 describe('planSessionOpen', () => {
   const target = { sessionId: SESSION, cwd: '/Users/me/app/src' }
 
-  test('focuses a tab that already owns the session', () => {
+  test('resumes rather than focus a tab where Claude has since exited', () => {
     const app = project('app', '/Users/me/app', [{ id: 't1', claudeSessionId: SESSION }])
+    expect(planSessionOpen([home, app], target, '')).toMatchObject({ kind: 'create', cwd: 'src' })
+  })
+
+  test('resumes rather than focus an owned tab running something other than Claude', () => {
+    const app = project('app', '/Users/me/app', [
+      { id: 't1', claudeSessionId: SESSION, agent: { command: 'aider', cwd: '/x' } },
+    ])
+    expect(planSessionOpen([home, app], target, '')).toMatchObject({ kind: 'create' })
+  })
+
+  test('resumes rather than focus an owned tab now on a different session', () => {
+    const app = project('app', '/Users/me/app', [
+      {
+        id: 't1',
+        claudeSessionId: SESSION,
+        agent: { command: 'claude', cwd: '/x', sessionId: 'other' },
+      },
+    ])
+    expect(planSessionOpen([home, app], target, '')).toMatchObject({ kind: 'create' })
+  })
+
+  test('focuses a tab that owns the session while Claude runs in it', () => {
+    const app = project('app', '/Users/me/app', [
+      { id: 't1', claudeSessionId: SESSION, agent: { command: 'claude', cwd: '/x' } },
+    ])
     expect(planSessionOpen([home, app], target, '')).toEqual({
       kind: 'focus',
       projectId: 'app',

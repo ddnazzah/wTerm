@@ -1,8 +1,14 @@
 // Where a todo's Claude session belongs in the workspace. Pure and shared: main uses
 // it to send a todo to a board, and the renderer uses it to reopen the session.
 
-import { buildResumeCommand } from './claude-session'
-import { HOME_PROJECT_ID, type Project, type ProjectId, type TerminalId } from './types'
+import { buildResumeCommand, isClaudeLaunch } from './claude-session'
+import {
+  HOME_PROJECT_ID,
+  type Project,
+  type ProjectId,
+  type TerminalId,
+  type TerminalRecord,
+} from './types'
 
 export type SessionOpenPlan =
   | { kind: 'focus'; projectId: ProjectId; terminalId: TerminalId }
@@ -32,14 +38,22 @@ function relativeTo(root: string, path: string): string | undefined {
   return path === base ? undefined : path.slice(base.length + 1)
 }
 
+/**
+ * The session Claude is running in this tab right now. claudeSessionId outlives the
+ * process, so without a running Claude it only says what the tab would restore.
+ */
+function liveSessionId(terminal: TerminalRecord): string | undefined {
+  const { agent, claudeSessionId } = terminal
+  if (!agent) return undefined
+  return agent.sessionId ?? (isClaudeLaunch(agent.command) ? claudeSessionId : undefined)
+}
+
 function findOpenTerminal(
   projects: Project[],
   sessionId: string
 ): { projectId: ProjectId; terminalId: TerminalId } | undefined {
   for (const project of projects) {
-    const terminal = project.terminals.find(
-      (t) => t.claudeSessionId === sessionId || t.agent?.sessionId === sessionId
-    )
+    const terminal = project.terminals.find((t) => liveSessionId(t) === sessionId)
     if (terminal) return { projectId: project.id, terminalId: terminal.id }
   }
   return undefined
