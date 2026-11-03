@@ -35,6 +35,13 @@ Everything lives in `<userData>/session-todos/`:
 - **A due date decides the bucket.** A todo with a `dueDate` sits in Future until the
   day before, Tomorrow that day, and Now from the day itself. Tomorrow and Future
   otherwise just mean later.
+- **Dated todos go to Apple Reminders, one way.** wTerm owns the sync because it
+  owns todo status. Each open dated todo gets a reminder in a `wTerm` list, alerting
+  at 9am on the day, so macOS alerts even with wTerm closed. Closing the todo
+  completes the reminder. Ticking a reminder changes no todo, and a deleted reminder
+  is not recreated. macOS only.
+- **One todo per title.** Sessions often discuss the same job, so an exact title
+  match against any tracked todo is dropped, whichever session raised it.
 - **Tomorrow rolls over.** A `tomorrow` todo shows under Now from the local day
   after it was created. This is derived at display time, not stored.
 - **Sessions can close their own todos.** The collector tells the model which
@@ -56,6 +63,8 @@ to everything after it.
 - wTerm revalidates every event on import. `sessionId` must be a UUID because it
   is interpolated into a shell command when a session is resumed.
 - The notification carries only a count, never model text.
+- Todo text reaches AppleScript only as `osascript` arguments, never inside the
+  script, so a crafted title stays plain text.
 
 ## Failure behaviour
 
@@ -64,6 +73,8 @@ to everything after it.
 - `status.json` records the error and the tab shows a banner. The tab also warns
   when the last success is old, or when the collector has never run.
 - A torn or malformed line in `suggestions.jsonl` is skipped, never fatal.
+- A failed reminder sync shows a banner in the tab and retries on the next change,
+  collector run, or launch.
 
 ## Not included
 

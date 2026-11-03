@@ -23,16 +23,26 @@ function register(current: Todo) {
   let stored = current
   const store = {
     get: () => stored,
+    list: () => [stored],
+    readCollectorStatus: async () => null,
     markSent: async (_id: string, card: Todo['card']) => {
       stored = { ...stored, card }
       return true
     },
   } as unknown as TodoStore
   const notifyChanged = vi.fn()
-  registerTodosIpc(store, notifyChanged, vi.fn())
+  registerTodosIpc(store, notifyChanged, vi.fn(), () => 'Reminders refused')
   const send = () => mocks.handlers.get(IPC.todos.sendToBoard)?.({}, 'a') as Promise<SendTodoResult>
   return { send, notifyChanged }
 }
+
+describe('todos snapshot', () => {
+  test('tells the tab why reminders are failing', async () => {
+    register(todo)
+    const snapshot = await mocks.handlers.get(IPC.todos.snapshot)?.({})
+    expect(snapshot).toEqual({ todos: [todo], collector: null, remindersError: 'Reminders refused' })
+  })
+})
 
 describe('todos sendToBoard', () => {
   beforeEach(() => {

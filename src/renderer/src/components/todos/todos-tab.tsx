@@ -6,7 +6,7 @@ import { collectorWarning, dueLabel, groupTodos, projectLabel } from '@renderer/
 import { useSettings } from '@renderer/state/settings'
 import { useWorkspace } from '@renderer/state/store'
 
-const EMPTY: TodosSnapshot = { todos: [], collector: null }
+const EMPTY: TodosSnapshot = { todos: [], collector: null, remindersError: null }
 
 const ROW_BUTTON =
   'px-1.5 h-6 rounded text-[11px] text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition-colors disabled:opacity-40 disabled:hover:bg-transparent'
@@ -132,7 +132,7 @@ function TodoSection({ label, todos, onError }: SectionProps) {
 
 /** Things to do, collected from Claude sessions across every project. */
 export function TodosTab() {
-  const { todos, collector } = useTodos()
+  const { todos, collector, remindersError } = useTodos()
   const [error, setError] = useState<string | null>(null)
   const [showDone, setShowDone] = useState(false)
   const onError = useCallback((message: string | null) => setError(message), [])
@@ -148,6 +148,11 @@ export function TodosTab() {
         {warning && (
           <div role="status" className="mb-3 px-3 py-2 rounded-md text-[12px] bg-amber-400/10 text-amber-300">
             {warning}
+          </div>
+        )}
+        {remindersError && (
+          <div role="status" className="mb-3 px-3 py-2 rounded-md text-[12px] bg-amber-400/10 text-amber-300">
+            {remindersError}
           </div>
         )}
         {error && (

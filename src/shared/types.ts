@@ -225,6 +225,8 @@ export interface Todo {
   closedAt?: string
   /** Set once sent to a project board. */
   card?: TodoCardRef
+  /** The live Apple Reminder for this todo, while it has one. */
+  reminderId?: string
 }
 
 /** What the background collector last reported about itself. */
@@ -238,6 +240,8 @@ export interface TodosSnapshot {
   todos: Todo[]
   /** Null until the collector has run. */
   collector: CollectorStatus | null
+  /** Why dated todos are not reaching Apple Reminders, if they are not. */
+  remindersError: string | null
 }
 
 export interface SendTodoResult {

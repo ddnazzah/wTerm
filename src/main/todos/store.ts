@@ -132,6 +132,12 @@ export class TodoStore {
     return this.update(id, (todo) => ({ ...todo, card }))
   }
 
+  setReminder(id: string, reminderId: string | undefined): Promise<boolean> {
+    return this.update(id, ({ reminderId: _old, ...todo }) =>
+      reminderId ? { ...todo, reminderId } : todo
+    )
+  }
+
   /** Null means the collector has not run yet, or left an unusable file. */
   async readCollectorStatus(): Promise<CollectorStatus | null> {
     try {

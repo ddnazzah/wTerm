@@ -162,4 +162,16 @@ describe('TodoStore.readCollectorStatus', () => {
     const store = await openStore()
     expect(await store.readCollectorStatus()).toBeNull()
   })
+
+  test('records and clears a reminder across a reload', async () => {
+    await appendSuggestions(add(ID_A))
+    const store = await openStore()
+    await store.importSuggestions()
+
+    await store.setReminder(ID_A, 'x-apple-reminder://1')
+    expect((await openStore()).get(ID_A)?.reminderId).toBe('x-apple-reminder://1')
+
+    await store.setReminder(ID_A, undefined)
+    expect((await openStore()).get(ID_A)).not.toHaveProperty('reminderId')
+  })
 })
