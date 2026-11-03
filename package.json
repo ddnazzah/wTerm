@@ -75,6 +75,11 @@
       ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "wTerm adds your dated todos to Apple Reminders so they alert on the day."
+      },
       "notarize": true,
       "artifactName": "wTerm-${version}-${arch}.${ext}"
     },

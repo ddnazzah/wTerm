@@ -14,6 +14,7 @@ import { registerBoardIpc } from './ipc/board'
 import { registerAgentIpc, startAgentHooks, stopAgentHooks } from './ipc/agent'
 import { registerTodosIpc } from './ipc/todos'
 import { BoardScheduler } from './board/scheduler'
+import { REMINDERS_LIST, createReminderSync, osascriptReminderClient } from './todos/reminders'
 import { TodoStore } from './todos/store'
 import { watchSuggestions } from './todos/watcher'
 import { IPC } from '@shared/types'
@@ -146,15 +147,36 @@ app.whenReady().then(async () => {
 
   // Todos are collected outside the app, so this only imports what has arrived. A
   // failure here must not take the app down.
-  const notifyTodosChanged = (): void => {
+  const sendTodosChanged = (): void => {
     mainWindow?.webContents.send(IPC.todos.changed)
   }
   const todosDir = join(app.getPath('userData'), 'session-todos')
   const todoStore = new TodoStore(todosDir)
-  registerTodosIpc(todoStore, notifyTodosChanged, notifyBoardChanged)
+  const reminderSync =
+    process.platform === 'darwin'
+      ? createReminderSync(
+          todoStore,
+          osascriptReminderClient(process.env.WTERM_REMINDERS_LIST ?? REMINDERS_LIST),
+          sendTodosChanged
+        )
+      : null
+  const notifyTodosChanged = (): void => {
+    sendTodosChanged()
+    void reminderSync?.run()
+  }
+  registerTodosIpc(
+    todoStore,
+    notifyTodosChanged,
+    notifyBoardChanged,
+    () => reminderSync?.error() ?? null
+  )
   todoStore
     .load()
-    .then(() => watchSuggestions(todosDir, todoStore, notifyTodosChanged))
+    .then(() => {
+      // Retries anything that failed last time, such as permission granted since.
+      void reminderSync?.run()
+      return watchSuggestions(todosDir, todoStore, notifyTodosChanged)
+    })
     .catch((err) => console.error('[todos] failed to start:', err))
 
   // Start the loopback listener that Claude Code's hooks report into. A bind

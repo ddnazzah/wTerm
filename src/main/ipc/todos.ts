@@ -57,13 +57,15 @@ async function isDirectory(path: string): Promise<boolean> {
 export function registerTodosIpc(
   store: TodoStore,
   notifyChanged: () => void,
-  notifyBoardChanged: () => void
+  notifyBoardChanged: () => void,
+  remindersError: () => string | null
 ): void {
   ipcMain.handle(
     IPC.todos.snapshot,
     async (): Promise<TodosSnapshot> => ({
       todos: store.list(),
       collector: await store.readCollectorStatus(),
+      remindersError: remindersError(),
     })
   )
 
