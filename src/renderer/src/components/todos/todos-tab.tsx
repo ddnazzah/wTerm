@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Todo, TodosSnapshot } from '@shared/types'
-import { findProjectForPath, planSessionOpen } from '@shared/todo-session'
-import { HOME_PROJECT_ID } from '@shared/types'
-import { TODOS_TAB_PATH } from '@renderer/lib/tab-uri'
-import { collectorWarning, coversTerminal, groupTodos, projectLabel } from '@renderer/lib/todo-view'
+import { findProjectForPath } from '@shared/todo-session'
+import { openTodoSession } from '@renderer/lib/open-todo-session'
+import { collectorWarning, groupTodos, projectLabel } from '@renderer/lib/todo-view'
 import { useSettings } from '@renderer/state/settings'
 import { useWorkspace } from '@renderer/state/store'
 
@@ -29,44 +28,6 @@ function useTodos(): TodosSnapshot {
   return snapshot
 }
 
-/** Focus the tab already on this session, or resume it in a new one. */
-async function openSession(todo: Todo): Promise<string | null> {
-  if (!(await window.api.todos.folderExists(todo.id))) {
-    return `${todo.cwd} no longer exists, so this session cannot be resumed.`
-  }
-  const workspace = useWorkspace.getState()
-  const startupCommand = useSettings.getState().terminal.startupCommand
-  const plan = planSessionOpen(workspace.projects, todo, startupCommand)
-  if (!plan) return `No workspace contains ${todo.cwd}.`
-
-  workspace.selectProject(plan.projectId)
-  if (plan.projectId === HOME_PROJECT_ID) workspace.setBottomPanelOpen(true)
-  // The editor panel shows while its project has any open tab, and it floats over
-  // the terminal. Closing only this tab leaves the user's own files alone.
-  workspace.openFiles
-    .filter((file) => file.path === TODOS_TAB_PATH)
-    .forEach((file) => workspace.closeFile(file))
-  if (coversTerminal(workspace.openFiles, plan.projectId, workspace.editorViewMode)) {
-    workspace.setEditorViewMode('docked')
-  }
-
-  if (plan.kind === 'focus') {
-    workspace.setActiveTerminal(plan.projectId, plan.terminalId)
-    return null
-  }
-  const record = await window.api.terminals.create({
-    projectId: plan.projectId,
-    id: crypto.randomUUID(),
-    name: todo.title,
-    cwd: plan.cwd,
-    resumeSessionId: plan.sessionId,
-    startupCommand: plan.startupCommand,
-  })
-  if (!record) return 'Could not open a terminal for this session.'
-  workspace.addTerminal(plan.projectId, record)
-  return null
-}
-
 interface RowProps {
   todo: Todo
   onError: (message: string | null) => void
@@ -79,7 +40,13 @@ function TodoRow({ todo, onError }: RowProps) {
   const label = findProjectForPath(projects, todo.cwd)?.name ?? projectLabel(todo.cwd)
 
   const open = (): void => {
-    openSession(todo)
+    openTodoSession(todo, {
+      workspace: useWorkspace.getState(),
+      startupCommand: useSettings.getState().terminal.startupCommand,
+      folderExists: window.api.todos.folderExists,
+      createTerminal: window.api.terminals.create,
+      newId: () => crypto.randomUUID(),
+    })
       .then(onError)
       .catch((err: unknown) => onError(String(err)))
   }

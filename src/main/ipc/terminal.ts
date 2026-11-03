@@ -61,11 +61,13 @@ export function createTerminal(
   if (opts.id) {
     const existing = project.terminals.find((t) => t.id === opts.id)
     const claudeSessionId = opts.resumeSessionId ?? existing?.claudeSessionId
+    const resumeCwd = opts.resumeSessionId ? opts.cwd : existing?.resumeCwd
     const record: TerminalRecord = {
       id: opts.id,
       name: existing?.name ?? opts.name ?? `Terminal ${project.terminals.length + 1}`,
       shell: existing?.shell ?? shell,
       ...(claudeSessionId ? { claudeSessionId } : {}),
+      ...(resumeCwd ? { resumeCwd } : {}),
       ...(existing?.agent ? { agent: existing.agent } : {}),
       ...(existing?.nameSource ? { nameSource: existing.nameSource } : {}),
     }

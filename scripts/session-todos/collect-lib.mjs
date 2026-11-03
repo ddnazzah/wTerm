@@ -26,7 +26,11 @@ const SECRET_PATTERNS = [
   /\bsk-[A-Za-z0-9_-]{16,}/g,
   /\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{20,}/g,
   /\bAKIA[0-9A-Z]{16}\b/g,
-  /["']?\b[\w-]*(?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?[^\s"',]{6,}["']?/gi,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+  /\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])/g,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s/@]+@\S*/gi,
+  /["']?\b[\w-]*(?:password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*(?:"[^"\n]*"|'[^'\n]*'|[^\s"',]{6,})/gi,
 ]
 
 const HARNESS_TAGS =
@@ -148,6 +152,27 @@ export function digestSession(sessionId, text) {
     user: user.slice(-MAX_USER_MESSAGES),
     lastAssistant,
   }
+}
+
+/** The folder name Claude files a session's transcript under. */
+export function transcriptDirName(cwd) {
+  return cwd.replace(/[^A-Za-z0-9]/g, '-')
+}
+
+/**
+ * The folder `claude --resume` can find this session from. A transcript's cwd follows
+ * the session as it changes directory, but resume looks only in the directory named
+ * after the folder, so the latest cwd alone is often the wrong one.
+ */
+export function findResumeCwd(text, dirName) {
+  const cwds = text.split('\n').map((line) => parseLine(line)?.cwd)
+  return cwds.findLast((cwd) => typeof cwd === 'string' && transcriptDirName(cwd) === dirName) ?? null
+}
+
+/** The calendar date on this machine, which is the day the Todos tab rolls over on. */
+export function localDate(date) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
 /** Fit digests in the size budget, oldest first. The rest wait for the next run. */

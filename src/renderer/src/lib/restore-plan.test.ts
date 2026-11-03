@@ -18,6 +18,24 @@ const SETTINGS: RestorePlanSettings = {
 }
 
 describe('planRestore', () => {
+  it('resumes a reopened session from its own folder after a restart', () => {
+    const [plan] = planRestore(
+      [
+        project([
+          {
+            id: 't1',
+            name: 'Tab',
+            shell: '/bin/zsh',
+            claudeSessionId: 'owned-1',
+            resumeCwd: '.claude/worktrees/x',
+          },
+        ]),
+      ],
+      SETTINGS
+    )
+    expect(plan).toMatchObject({ cwd: '.claude/worktrees/x', resumeSessionId: 'owned-1' })
+  })
+
   it('resumes a wTerm-owned session by exact id, preferring the captured flags', () => {
     const plan = planRestore(
       [

@@ -41,6 +41,12 @@ export interface TerminalRecord {
    */
   claudeSessionId?: string
   /**
+   * The folder, relative to the project root, that {@link claudeSessionId} resumes
+   * from. Set when a session started outside the root is reopened, because resume
+   * only finds a session from its original folder.
+   */
+  resumeCwd?: string
+  /**
    * The long-running agent command (and the cwd it ran in) that was active in
    * this tab at last save, captured alias-expanded from shell integration
    * (OSC 697). On the next launch the tab is recreated in that cwd running the

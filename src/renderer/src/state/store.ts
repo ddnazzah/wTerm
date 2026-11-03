@@ -242,6 +242,8 @@ interface WorkspaceState {
   /** The non-fullscreen mode to fall back to when leaving fullscreen. */
   previousEditorViewMode: EditorViewMode
   setEditorViewMode: (m: EditorViewMode) => void
+  /** Dock for now without replacing the mode the user chose to keep across launches. */
+  dockEditorForSession: () => void
   /** Leave fullscreen, restoring the mode that was active before entering it. */
   exitFullscreen: () => void
   dockSplitRatio: number
@@ -436,6 +438,7 @@ export const useWorkspace = create<WorkspaceState>((set) => ({
           : state.previousEditorViewMode,
     }))
   },
+  dockEditorForSession: () => set({ editorViewMode: 'docked' }),
   exitFullscreen: () => {
     set((state) => {
       if (state.editorViewMode !== 'fullscreen') return state
