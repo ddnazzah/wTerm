@@ -19,6 +19,7 @@ import {
   withSessionId,
 } from '@shared/claude-session'
 import { sniffSessionId } from '../pty/claude-session-watch'
+import { capturedAgent } from '../pty/claude-session-track'
 import type { PtyManager } from '../pty/manager'
 
 /** Resolve a project-relative cwd, refusing anything that escapes the project root. */
@@ -212,7 +213,7 @@ function handleRunningCommand(
   // An explicit `--resume <id>` / `--session-id <id>` names the session
   // directly; anything else gets sniffed from the cwd's session folder.
   const pinned = isClaudeLaunch(agent.command) ? extractPinnedSessionId(agent.command) : null
-  const next = { command: agent.command, cwd: agent.cwd, ...(pinned ? { sessionId: pinned } : {}) }
+  const next = capturedAgent(t.agent, agent)
   if (JSON.stringify(t.agent) !== JSON.stringify(next)) {
     upsertTerminal(projectId, { ...t, agent: next })
   }
