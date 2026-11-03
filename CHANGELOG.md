@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.0
+
+### Added
+
+- **Todos from your Claude sessions**: a background job reads recent sessions every
+  30 minutes and lists what needs you in a new Todos tab, under Now, Tomorrow and
+  Future. Tick or dismiss a todo, reopen its session, or send it to the board. Set it
+  up once with `pnpm todos:install`.
+- **Due dates**: a todo with a known day shows it, sits in Future until the day
+  before, then moves to Tomorrow and Now by itself.
+- **Apple Reminders**: dated todos are added to a `wTerm` list and alert at 9am on the
+  day, even with wTerm closed. Closing the todo completes its reminder. macOS asks
+  for permission the first time.
+
+### Changed
+
+- **Side bar**: Board, Notes, Todos and Terminal moved from the top bar to the right
+  activity bar, and each icon shows its name on hover.
+
 ## 0.7.4
 
 ### Fixed
