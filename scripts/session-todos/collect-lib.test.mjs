@@ -374,6 +374,22 @@ describe('buildEvents', () => {
     expect(count('2026-11-01', 'future')).toBe(1)
   })
 
+  test('skips a todo another session already tracks under the same title', () => {
+    const other = '22222222-2222-4222-8222-222222222222'
+    const tracked = { x: { sessionId: other, title: 'approve   PR', at: now } }
+    const { events, tracked: next } = buildEvents({ adds: [add], resolved: [] }, digests, tracked, now)
+    expect(events).toEqual([])
+    expect(Object.keys(next)).toEqual(['x'])
+  })
+
+  test('two sessions raising the same todo in one run produce one', () => {
+    const other = '22222222-2222-4222-8222-222222222222'
+    const both = [...digests, { sessionId: other, cwd: '/other', branch: 'main' }]
+    const adds = [add, { ...add, sessionId: other }]
+    const { events } = buildEvents({ adds, resolved: [] }, both, {}, now)
+    expect(events.map((event) => event.sessionId)).toEqual([SESSION])
+  })
+
   test('does not re-add a todo that is already tracked', () => {
     const tracked = { [todoId(SESSION, 'Approve PR')]: { sessionId: SESSION, title: 'Approve PR', at: now } }
     const { events, nowCount } = buildEvents({ adds: [add], resolved: [] }, digests, tracked, now)
