@@ -18,6 +18,29 @@ const SETTINGS: RestorePlanSettings = {
 }
 
 describe('planRestore', () => {
+  it('resumes the conversation a tab moved to, from its folder, not the one it launched with', () => {
+    const [plan] = planRestore(
+      [
+        project([
+          {
+            id: 't1',
+            name: 'Tab',
+            shell: '/bin/zsh',
+            resumeCwd: '.claude/worktrees/x',
+            agent: {
+              command: 'claude --dangerously-skip-permissions --resume old',
+              cwd: PROJECT_PATH,
+              sessionId: 'moved-to',
+            },
+          },
+        ]),
+      ],
+      SETTINGS
+    )
+    expect(plan.cwd).toBe('.claude/worktrees/x')
+    expect(plan.startupCommand).toBe('claude --dangerously-skip-permissions --resume moved-to')
+  })
+
   it('resumes a reopened session from its own folder after a restart', () => {
     const [plan] = planRestore(
       [

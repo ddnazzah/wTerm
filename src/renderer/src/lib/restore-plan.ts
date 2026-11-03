@@ -78,6 +78,7 @@ function planTerminal(
         : undefined
       return {
         ...base,
+        cwd: terminal.resumeCwd ?? base.cwd,
         startupCommand: buildAgentResumeCommand(terminal.agent.command, rule.resume, sessionId),
       }
     }

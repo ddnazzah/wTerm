@@ -285,6 +285,11 @@ export class PtyManager {
     return this.entries.has(id)
   }
 
+  /** The tab's shell process, if it is running. */
+  rootPid(id: TerminalId): number | undefined {
+    return this.entries.get(id)?.pty.pid
+  }
+
   write(id: TerminalId, data: string): void {
     const entry = this.entries.get(id)
     entry?.pty.write(data)

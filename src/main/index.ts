@@ -18,7 +18,8 @@ import { REMINDERS_LIST, createReminderSync, osascriptReminderClient } from './t
 import { TodoStore } from './todos/store'
 import { watchSuggestions } from './todos/watcher'
 import { IPC } from '@shared/types'
-import { loadState, saveStateNow } from './store/state'
+import { getProject, getState, loadState, saveStateNow, upsertTerminal } from './store/state'
+import { startSessionTracking, withLiveSession } from './pty/claude-session-track'
 import { setSyncWindow } from './sync'
 import { PtyManager } from './pty/manager'
 import { MobileBridge } from './bridge/server'
@@ -59,6 +60,7 @@ if (APP_ICON_PATH && process.platform === 'darwin') {
 }
 
 let mainWindow: BrowserWindow | null = null
+let stopSessionTracking: (() => void) | null = null
 const ptyManager = new PtyManager()
 const mobileBridge = new MobileBridge(ptyManager)
 // Set once we begin tearing down — either a normal quit or an update install —
@@ -187,6 +189,26 @@ app.whenReady().then(async () => {
     console.error('[agent-hook] failed to start:', err)
   )
 
+  // Windows has no `ps`, so tabs there keep the id from their launch command.
+  if (process.platform !== 'win32') {
+    stopSessionTracking = startSessionTracking({
+      listTabs: () =>
+        getState().projects.flatMap((project) =>
+          project.terminals.flatMap((terminal) => {
+            const rootPid = ptyManager.rootPid(terminal.id)
+            return rootPid ? [{ projectId: project.id, terminal, rootPid }] : []
+          })
+        ),
+      // Re-read the record: a rename during the pass must not be overwritten.
+      update: (projectId, next) => {
+        const current = getProject(projectId)?.terminals.find((t) => t.id === next.id)
+        const sessionId = next.agent?.sessionId
+        if (!current || !sessionId) return
+        upsertTerminal(projectId, withLiveSession(current, sessionId, next.resumeCwd))
+      },
+    })
+  }
+
   // Start the mobile bridge. A bind failure (e.g. port in use) must not take the
   // app down — the desktop keeps working without the phone feature.
   mobileBridge.start().catch((err) => console.error('[bridge] failed to start:', err))
@@ -206,6 +228,7 @@ app.on('before-quit', (e) => {
   if (isQuitting) return
   e.preventDefault()
   isQuitting = true
+  stopSessionTracking?.()
   ptyManager.disposeAll()
   void stopAgentHooks()
   saveStateNow()
