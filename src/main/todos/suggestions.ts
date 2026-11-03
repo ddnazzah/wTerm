@@ -29,6 +29,13 @@ function isBucket(value: unknown): value is TodoBucket {
   return TODO_BUCKETS.includes(value as TodoBucket)
 }
 
+/** True for a YYYY-MM-DD that exists, so not 2026-02-31. */
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
 function parseAdd(raw: Record<string, unknown>): SuggestionEvent | null {
   const id = str(raw.id)
   const title = str(raw.title).trim().slice(0, MAX_TITLE_CHARS)
@@ -47,6 +54,7 @@ function parseAdd(raw: Record<string, unknown>): SuggestionEvent | null {
       title,
       detail: str(raw.detail).trim().slice(0, MAX_DETAIL_CHARS),
       bucket,
+      ...(isCalendarDate(raw.dueDate) ? { dueDate: raw.dueDate } : {}),
       status: 'open',
       sessionId,
       cwd,

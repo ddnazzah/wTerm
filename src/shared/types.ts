@@ -214,6 +214,8 @@ export interface Todo {
   title: string
   detail: string
   bucket: TodoBucket
+  /** The local day it is due, YYYY-MM-DD. When set it decides over the bucket. */
+  dueDate?: string
   status: TodoStatus
   sessionId: string
   /** Absolute folder the session ran in; resuming requires this exact folder. */

@@ -6,6 +6,7 @@ import {
   buildPrompt,
   digestSession,
   findResumeCwd,
+  isCalendarDate,
   localDate,
   transcriptDirName,
   packDigests,
@@ -252,10 +253,40 @@ describe('buildPrompt', () => {
     const digests = [{ sessionId: SESSION, cwd: '/r', branch: 'b', lastAt: 't', user: ['hi'], lastAssistant: 'ok' }]
     const tracked = { abc: { sessionId: SESSION, title: 'Approve PR', at: 't' }, zzz: { sessionId: OTHER_SESSION, title: 'Other', at: 't' } }
     const prompt = buildPrompt(digests, tracked, '2026-11-02')
+    expect(prompt).toContain('Monday 2026-11-02')
     expect(prompt).toContain('2026-11-02')
     expect(prompt).toContain(SESSION)
     expect(prompt).toContain('Approve PR')
     expect(prompt).not.toContain('Other')
+  })
+})
+
+describe('isCalendarDate', () => {
+  test.each(['2026-11-10', '2028-02-29'])('accepts %s', (value) => {
+    expect(isCalendarDate(value)).toBe(true)
+  })
+
+  test.each(['2026-02-31', '2026-13-01', '10 November', '2026-11-10T00:00:00Z', '', null, undefined, 20261110])(
+    'rejects %s',
+    (value) => {
+      expect(isCalendarDate(value)).toBe(false)
+    }
+  )
+})
+
+describe('validateResult dates', () => {
+  const digests = [{ sessionId: SESSION }]
+  const add = { sessionId: SESSION, title: 'Switch OneSignal', detail: 'd', bucket: 'future' }
+
+  test('keeps a real due date', () => {
+    const { adds } = validateResult({ add: [{ ...add, dueDate: '2026-11-10' }], resolved: [] }, digests, {})
+    expect(adds[0].dueDate).toBe('2026-11-10')
+  })
+
+  test.each([null, 'next week', '2026-02-31'])('keeps the todo but drops the date %s', (dueDate) => {
+    const { adds } = validateResult({ add: [{ ...add, dueDate }], resolved: [] }, digests, {})
+    expect(adds).toHaveLength(1)
+    expect(adds[0]).not.toHaveProperty('dueDate')
   })
 })
 
@@ -334,6 +365,13 @@ describe('buildEvents', () => {
       },
       { type: 'resolve', id: 'old' },
     ])
+  })
+
+  test('counts a dated todo as needing attention only once its day has come', () => {
+    const count = (dueDate, bucket) =>
+      buildEvents({ adds: [{ ...add, bucket, dueDate }], resolved: [] }, digests, {}, now).nowCount
+    expect(count('2026-11-10', 'now')).toBe(0)
+    expect(count('2026-11-01', 'future')).toBe(1)
   })
 
   test('does not re-add a todo that is already tracked', () => {

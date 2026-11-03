@@ -5,6 +5,7 @@ import {
   STALE_AFTER_MS,
   collectorWarning,
   coversTerminal,
+  dueLabel,
   effectiveBucket,
   groupTodos,
   projectLabel,
@@ -41,6 +42,40 @@ describe('effectiveBucket', () => {
   })
 })
 
+describe('effectiveBucket with a due date', () => {
+  const dated = todo({ bucket: 'tomorrow', dueDate: '2026-11-10' })
+
+  test('a todo dated next week sits in Future whatever bucket it was given', () => {
+    expect(effectiveBucket(dated, at('2026-11-03T09:00:00'))).toBe('future')
+    expect(effectiveBucket({ ...dated, bucket: 'now' }, at('2026-11-03T09:00:00'))).toBe('future')
+  })
+
+  test('it moves to Tomorrow the day before, across a month end too', () => {
+    expect(effectiveBucket(dated, at('2026-11-09T09:00:00'))).toBe('tomorrow')
+    const firstOfMonth = todo({ dueDate: '2026-12-01' })
+    expect(effectiveBucket(firstOfMonth, at('2026-11-30T09:00:00'))).toBe('tomorrow')
+  })
+
+  test('it moves to Now on the day and stays there once overdue', () => {
+    expect(effectiveBucket(dated, at('2026-11-10T00:01:00'))).toBe('now')
+    expect(effectiveBucket(dated, at('2026-12-25T09:00:00'))).toBe('now')
+  })
+})
+
+describe('dueLabel', () => {
+  const now = at('2026-11-03T09:00:00')
+
+  test.each([
+    ['2026-11-03', 'Due today'],
+    ['2026-11-04', 'Due tomorrow'],
+    ['2026-11-10', 'Due Nov 10'],
+    ['2026-11-01', 'Overdue, Nov 1'],
+    ['2027-01-15', 'Due Jan 15, 2027'],
+  ])('%s reads as %s', (dueDate, label) => {
+    expect(dueLabel(dueDate, now)).toBe(label)
+  })
+})
+
 describe('groupTodos', () => {
   const now = at('2026-11-03T09:00:00')
 
@@ -58,6 +93,18 @@ describe('groupTodos', () => {
     expect(groups.now.map((t) => t.id)).toEqual(['new-now', 'rolled', 'old-now'])
     expect(groups.tomorrow.map((t) => t.id)).toEqual(['tmrw'])
     expect(groups.future.map((t) => t.id)).toEqual(['fut'])
+  })
+
+  test('lists the soonest date first, then undated todos', () => {
+    const groups = groupTodos(
+      [
+        todo({ id: 'undated', bucket: 'future', createdAt: '2026-11-03T08:00:00' }),
+        todo({ id: 'december', bucket: 'future', dueDate: '2026-12-01' }),
+        todo({ id: 'november', bucket: 'future', dueDate: '2026-11-10' }),
+      ],
+      now
+    )
+    expect(groups.future.map((t) => t.id)).toEqual(['november', 'december', 'undated'])
   })
 
   test('done todos are listed apart, and dismissed todos are hidden', () => {

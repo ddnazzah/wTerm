@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Todo, TodosSnapshot } from '@shared/types'
 import { findProjectForPath } from '@shared/todo-session'
 import { openTodoSession } from '@renderer/lib/open-todo-session'
-import { collectorWarning, groupTodos, projectLabel } from '@renderer/lib/todo-view'
+import { collectorWarning, dueLabel, groupTodos, projectLabel } from '@renderer/lib/todo-view'
 import { useSettings } from '@renderer/state/settings'
 import { useWorkspace } from '@renderer/state/store'
 
@@ -79,6 +79,9 @@ function TodoRow({ todo, onError }: RowProps) {
             <div className="mt-0.5 text-[12px] leading-snug text-foreground/55">{todo.detail}</div>
           )}
           <div className="mt-1 flex gap-1.5 text-[11px] font-mono text-foreground/35">
+            {todo.dueDate && !isDone && (
+              <span className="flex-shrink-0 text-accent">{dueLabel(todo.dueDate, new Date())} ·</span>
+            )}
             <span className="truncate">
               {label}
               {todo.branch ? ` · ${todo.branch}` : ''}
