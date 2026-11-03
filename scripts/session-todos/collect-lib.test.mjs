@@ -342,6 +342,16 @@ describe('pruneTracked', () => {
     const kept = pruneTracked({ old: ago(TRACKED_MAX_AGE_MS + 1000), recent: ago(1000) }, nowMs)
     expect(Object.keys(kept)).toEqual(['recent'])
   })
+
+  test('keeps an old todo until its due day has passed', () => {
+    const nowMs = new Date(2026, 10, 2, 12).getTime()
+    const old = { sessionId: SESSION, title: 't', at: new Date(nowMs - TRACKED_MAX_AGE_MS - 1000).toISOString() }
+    const kept = pruneTracked(
+      { upcoming: { ...old, dueDate: '2026-11-10' }, today: { ...old, dueDate: '2026-11-02' }, past: { ...old, dueDate: '2026-11-01' } },
+      nowMs
+    )
+    expect(Object.keys(kept)).toEqual(['upcoming', 'today'])
+  })
 })
 
 describe('buildEvents', () => {
@@ -374,20 +384,47 @@ describe('buildEvents', () => {
     expect(count('2026-11-01', 'future')).toBe(1)
   })
 
-  test('skips a todo another session already tracks under the same title', () => {
+  describe('the same job raised by another session', () => {
     const other = '22222222-2222-4222-8222-222222222222'
-    const tracked = { x: { sessionId: other, title: 'approve   PR', at: now } }
-    const { events, tracked: next } = buildEvents({ adds: [add], resolved: [] }, digests, tracked, now)
-    expect(events).toEqual([])
-    expect(Object.keys(next)).toEqual(['x'])
-  })
+    const trackedElsewhere = (patch) => ({
+      x: { sessionId: other, title: 'approve   PR', at: now, cwd: '/repo', ...patch },
+    })
 
-  test('two sessions raising the same todo in one run produce one', () => {
-    const other = '22222222-2222-4222-8222-222222222222'
-    const both = [...digests, { sessionId: other, cwd: '/other', branch: 'main' }]
-    const adds = [add, { ...add, sessionId: other }]
-    const { events } = buildEvents({ adds, resolved: [] }, both, {}, now)
-    expect(events.map((event) => event.sessionId)).toEqual([SESSION])
+    test('is skipped when it has the same title in the same folder', () => {
+      const { events, tracked } = buildEvents({ adds: [add], resolved: [] }, digests, trackedElsewhere(), now)
+      expect(events).toEqual([])
+      expect(Object.keys(tracked)).toEqual(['x'])
+    })
+
+    test('is skipped when it has the same title and day in another folder', () => {
+      const dated = { ...add, dueDate: '2026-11-10' }
+      const tracked = trackedElsewhere({ cwd: '/other', dueDate: '2026-11-10' })
+      expect(buildEvents({ adds: [dated], resolved: [] }, digests, tracked, now).events).toEqual([])
+    })
+
+    test('two raising it in one run produce one', () => {
+      const both = [...digests, { sessionId: other, cwd: '/repo', branch: 'main' }]
+      const adds = [add, { ...add, sessionId: other }]
+      const { events } = buildEvents({ adds, resolved: [] }, both, {}, now)
+      expect(events.map((event) => event.sessionId)).toEqual([SESSION])
+    })
+
+    test('is kept when the same title is another job in another folder', () => {
+      const tracked = trackedElsewhere({ cwd: '/other' })
+      const { events } = buildEvents({ adds: [add], resolved: [] }, digests, tracked, now)
+      expect(events.map((event) => event.type)).toEqual(['add'])
+    })
+
+    test('is kept when the matching todo is resolved in the same run', () => {
+      const { events } = buildEvents({ adds: [add], resolved: ['x'] }, digests, trackedElsewhere(), now)
+      expect(events.map((event) => event.type)).toEqual(['add', 'resolve'])
+    })
+
+    test('remembers folder and day so later runs can compare', () => {
+      const dated = { ...add, dueDate: '2026-11-10' }
+      const { tracked } = buildEvents({ adds: [dated], resolved: [] }, digests, {}, now)
+      expect(tracked[todoId(SESSION, 'Approve PR')]).toMatchObject({ cwd: '/repo', dueDate: '2026-11-10' })
+    })
   })
 
   test('does not re-add a todo that is already tracked', () => {

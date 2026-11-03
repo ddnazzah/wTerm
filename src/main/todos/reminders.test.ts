@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { Todo } from '@shared/types'
 import {
+  createArgs,
   createReminderSync,
   dueArgs,
   friendlyReminderError,
@@ -69,6 +70,11 @@ describe('reminder fields', () => {
     expect(reminderBody(todo())).toBe('OneSignal renews on 12 November.\n\nFrom wTerm: /repo')
   })
 
+  test('a NUL in stored text cannot make the osascript call throw', () => {
+    const args = createArgs('wTerm', todo({ title: 'A\u0000B', detail: 'C\u0000D' }))
+    expect(args).toEqual(['wTerm', 'AB', 'CD\n\nFrom wTerm: /repo', '2026', '11', '10', '9'])
+  })
+
   test('the alert is at 9am on the due day', () => {
     expect(dueArgs('2026-11-10')).toEqual(['2026', '11', '10', '9'])
   })
@@ -116,6 +122,20 @@ describe('createReminderSync', () => {
     finish('r1')
     await Promise.all([first, second])
     expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  test('a listener that throws does not stop later passes', async () => {
+    const create = vi
+      .fn<ReminderClient['create']>()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue('r1')
+    const { store, reminders, current } = fakes([todo()], { create })
+    const sync = createReminderSync(store, reminders, () => {
+      throw new Error('Object has been destroyed')
+    })
+    await sync.run()
+    await sync.run()
+    expect(current()[0].reminderId).toBe('r1')
   })
 
   test('a failure is reported once, stops the run and clears after a good run', async () => {
