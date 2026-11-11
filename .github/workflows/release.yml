@@ -23,7 +23,7 @@ jobs:
       matrix:
         include:
           # Apple Silicon runner -> arm64 DMG (install) + zip & latest-mac.yml (auto-update feed)
-          - os: macos-14
+          - os: macos-15
             artifact: |
               release/*/*.dmg
               release/*/*.zip
