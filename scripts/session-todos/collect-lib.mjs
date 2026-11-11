@@ -272,6 +272,27 @@ function isSameJob(a, b) {
   return a.cwd === b.cwd || (Boolean(a.dueDate) && a.dueDate === b.dueDate)
 }
 
+/**
+ * A todo is a question a session put to the user. Once the user has written in that
+ * session again they have answered it or moved past it, so it closes without waiting
+ * for the model to notice. The rest stay open and go to the model as before.
+ */
+export function repliedTodos(tracked, digests) {
+  const repliedSessions = new Set(digests.filter((d) => d.user?.length > 0).map((d) => d.sessionId))
+  const replied = Object.keys(tracked).filter((id) => repliedSessions.has(tracked[id].sessionId))
+  return { open: withoutIds(tracked, replied), replied }
+}
+
+export function withoutIds(tracked, ids) {
+  return Object.fromEntries(Object.entries(tracked).filter(([id]) => !ids.includes(id)))
+}
+
+/** A replied todo the model raised again is still pending, so it is not closed. */
+export function stillAnswered(replied, adds) {
+  const reraised = new Set(adds.map((add) => todoId(add.sessionId, add.title)))
+  return replied.filter((id) => !reraised.has(id))
+}
+
 /** Turn validated output into suggestion events plus the next tracked map. */
 export function buildEvents({ adds, resolved }, digests, tracked, nowIso) {
   const bySession = new Map(digests.map((d) => [d.sessionId, d]))

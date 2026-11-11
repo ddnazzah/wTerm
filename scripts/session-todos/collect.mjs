@@ -18,6 +18,9 @@ import {
   packDigests,
   planRead,
   pruneTracked,
+  repliedTodos,
+  stillAnswered,
+  withoutIds,
   sliceCompleteLines,
   validateResult,
   findResumeCwd,
@@ -177,10 +180,14 @@ async function appendEvents(events) {
 
 /** Ask the model about included digests. Returns the tracked map to persist. */
 async function extractTodos(included, tracked, nowIso) {
-  const prompt = buildPrompt(included, tracked, localDate(new Date(nowIso)))
-  const validated = validateResult(await runClaude(prompt), included, tracked)
-  const result = buildEvents(validated, included, tracked, nowIso)
-  await appendEvents(result.events)
+  const { open, replied } = repliedTodos(tracked, included)
+  const prompt = buildPrompt(included, open, localDate(new Date(nowIso)))
+  const validated = validateResult(await runClaude(prompt), included, open)
+  const answered = stillAnswered(replied, validated.adds)
+  // A re-raised todo stays tracked, so buildEvents sees it as known and adds no copy.
+  const result = buildEvents(validated, included, withoutIds(tracked, answered), nowIso)
+  const closed = answered.map((id) => ({ type: 'resolve', id }))
+  await appendEvents([...closed, ...result.events])
   notify(result.nowCount)
   return result.tracked
 }

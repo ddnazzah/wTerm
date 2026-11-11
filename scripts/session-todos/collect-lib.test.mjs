@@ -13,6 +13,9 @@ import {
   planRead,
   pruneTracked,
   redactSecrets,
+  repliedTodos,
+  stillAnswered,
+  withoutIds,
   TRACKED_MAX_AGE_MS,
   sliceCompleteLines,
   todoId,
@@ -444,5 +447,57 @@ describe('buildEvents', () => {
     const result = buildEvents({ adds: [add], resolved: ['old'] }, digests, tracked, now)
     expect(Object.keys(result.tracked)).toEqual([todoId(SESSION, 'Approve PR')])
     expect(tracked.old).toBeDefined()
+  })
+})
+
+describe('repliedTodos', () => {
+  const tracked = {
+    asked: { sessionId: SESSION, title: 'Approve PR', at: '2026-11-01T00:00:00.000Z' },
+    elsewhere: { sessionId: OTHER_SESSION, title: 'Pick a name', at: '2026-11-01T00:00:00.000Z' },
+  }
+
+  test('closes a tracked todo once the user has written in its session again', () => {
+    const digests = [{ sessionId: SESSION, user: ['yes, go ahead'] }]
+    const { open, replied } = repliedTodos(tracked, digests)
+    expect(replied).toEqual(['asked'])
+    expect(Object.keys(open)).toEqual(['elsewhere'])
+  })
+
+  test('keeps a todo whose session only has new agent output', () => {
+    const digests = [{ sessionId: SESSION, user: [] }]
+    const { open, replied } = repliedTodos(tracked, digests)
+    expect(replied).toEqual([])
+    expect(open).toEqual(tracked)
+  })
+
+  test('keeps a todo whose session was not read this run', () => {
+    const digests = [{ sessionId: '33333333-3333-4333-8333-333333333333', user: ['hi'] }]
+    expect(repliedTodos(tracked, digests).replied).toEqual([])
+  })
+
+  test('does not mutate the tracked map it was given', () => {
+    const copy = structuredClone(tracked)
+    repliedTodos(tracked, [{ sessionId: SESSION, user: ['ok'] }])
+    expect(tracked).toEqual(copy)
+  })
+})
+
+describe('stillAnswered', () => {
+  test('drops a replied todo the model raised again, so it stays open', () => {
+    const adds = [{ sessionId: SESSION, title: 'Approve PR' }]
+    const reraised = todoId(SESSION, 'approve  pr')
+    expect(stillAnswered([reraised, 'other'], adds)).toEqual(['other'])
+  })
+
+  test('closes every replied todo when the model raised nothing', () => {
+    expect(stillAnswered(['a', 'b'], [])).toEqual(['a', 'b'])
+  })
+})
+
+describe('withoutIds', () => {
+  test('returns a copy without the named ids and leaves the input alone', () => {
+    const tracked = { a: { title: 'A' }, b: { title: 'B' } }
+    expect(withoutIds(tracked, ['a', 'missing'])).toEqual({ b: { title: 'B' } })
+    expect(Object.keys(tracked)).toEqual(['a', 'b'])
   })
 })

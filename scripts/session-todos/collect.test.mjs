@@ -28,17 +28,19 @@ async function writeFakeClaude(body) {
 const replyWith = (output) =>
   writeFakeClaude(`cat <<'JSON'\n${JSON.stringify({ is_error: false, structured_output: output })}\nJSON`)
 
-const transcriptLine = (text) =>
+const transcriptLine = (text, role = 'user') =>
   JSON.stringify({
-    type: 'user',
+    type: role,
     cwd: '/repo',
     gitBranch: 'main',
     timestamp: new Date().toISOString(),
-    message: { role: 'user', content: text },
+    message: { role, content: role === 'user' ? text : [{ type: 'text', text }] },
   }) + '\n'
 
 const appendTranscript = (text, session = SESSION) =>
   fs.appendFile(join(projectDir, `${session}.jsonl`), transcriptLine(text))
+const appendAgentReply = (text, session = SESSION) =>
+  fs.appendFile(join(projectDir, `${session}.jsonl`), transcriptLine(text, 'assistant'))
 
 async function collect() {
   const env = {
@@ -220,10 +222,37 @@ describe('collector run', () => {
     await collect()
 
     await fs.rm(callLog)
-    await appendTranscript('two')
+    await appendAgentReply('still waiting on you')
     await collect()
     expect(await fs.readFile(callLog, 'utf-8')).toContain('Approve the PR')
     expect(await readEvents()).toHaveLength(1)
+  })
+
+  test('closes a todo once the user writes in its session again', async () => {
+    await appendTranscript('one')
+    await replyWith({ add: [add], resolved: [] })
+    await collect()
+    const [added] = await readEvents()
+
+    await fs.rm(callLog)
+    await appendTranscript('yes, go ahead')
+    await replyWith({ add: [], resolved: [] })
+    await collect()
+    expect(await fs.readFile(callLog, 'utf-8')).not.toContain('Approve the PR')
+    expect((await readEvents()).slice(1)).toEqual([{ type: 'resolve', id: added.id }])
+    expect((await readJson('state.json')).tracked).toEqual({})
+  })
+
+  test('keeps a replied todo open when the model says it is still pending', async () => {
+    await appendTranscript('one')
+    await replyWith({ add: [add], resolved: [] })
+    await collect()
+
+    await appendTranscript('not yet, later')
+    await collect()
+    const events = await readEvents()
+    expect(events.map((event) => event.type)).toEqual(['add'])
+    expect(Object.keys((await readJson('state.json')).tracked)).toEqual([events[0].id])
   })
 
   test('skips old transcripts on first sight instead of backfilling history', async () => {
