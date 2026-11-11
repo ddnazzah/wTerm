@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1
+
+### Fixed
+
+- **Stale sessions on restart**: a tab that moved to another conversation with
+  `/clear` or `/resume` came back on the one it was first launched with, sometimes
+  weeks old. wTerm now follows the conversation each tab's Claude is really in and
+  restores that one. Tabs that are already stale need one `/resume` by hand, then stay
+  right.
+
 ## 0.8.0
 
 ### Added
