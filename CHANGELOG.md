@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.2
+
+### Fixed
+
+- **Todos piling up**: a todo only closed when the background job happened to notice
+  it was dealt with, so old ones lingered for days. A todo now closes as soon as you
+  write in its session again, unless the session still shows it pending. Run
+  `pnpm todos:install` once to pick up the new job.
+
 ## 0.8.1
 
 ### Fixed
