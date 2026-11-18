@@ -110,6 +110,17 @@ export function uninstallHooks(settings: Record<string, unknown>): Record<string
  * reinstalled) or an entry from an older wTerm reads as not installed, so the
  * caller rewrites it.
  */
+/**
+ * True when the user has opted in at some point: any wTerm entry is present,
+ * current or not. This, not `hooksInstalled`, decides whether wTerm may rewrite
+ * the entries on launch: an entry from an older wTerm, or one pointing at a
+ * moved app, is still the user's opt-in.
+ */
+export function wtermHooksPresent(settings: Record<string, unknown>): boolean {
+  const map = asHookMap(settings)
+  return Object.values(map).some((entries) => Array.isArray(entries) && entries.some(isWtermEntry))
+}
+
 export function hooksInstalled(settings: Record<string, unknown>, relayPath: string): boolean {
   const map = asHookMap(settings)
   return HOOK_EVENTS.every((event) => {

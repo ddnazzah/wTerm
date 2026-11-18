@@ -5,6 +5,7 @@ import {
   installHooks,
   relayCommand,
   STOP_HOOK_TIMEOUT_S,
+  wtermHooksPresent,
   uninstallHooks,
 } from './hook-settings'
 
@@ -96,6 +97,24 @@ describe('Stop hook timeout', () => {
 
     expect(hooksInstalled(old, RELAY)).toBe(false)
     expect(hooksInstalled(installHooks(old, RELAY), RELAY)).toBe(true)
+  })
+})
+
+describe('wtermHooksPresent', () => {
+  it('is true for an install from an older wTerm, which hooksInstalled reports as stale', () => {
+    const old = { hooks: { Stop: [{ hooks: [{ type: 'command', command: relayCommand('/old/agent-hook.sh') }] }] } }
+
+    expect(hooksInstalled(old, RELAY)).toBe(false)
+    expect(wtermHooksPresent(old)).toBe(true)
+  })
+
+  it('is false when only the user\'s own hooks exist', () => {
+    expect(wtermHooksPresent(userSettings())).toBe(false)
+    expect(wtermHooksPresent({})).toBe(false)
+  })
+
+  it('is false again after uninstall', () => {
+    expect(wtermHooksPresent(uninstallHooks(installHooks(userSettings(), RELAY)))).toBe(false)
   })
 })
 

@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { hooksInstalled, installHooks, uninstallHooks } from './hook-settings'
+import { hooksInstalled, installHooks, uninstallHooks, wtermHooksPresent } from './hook-settings'
 
 // Reading and writing the user's Claude Code settings file.
 //
@@ -89,6 +89,18 @@ export async function installAgentHooks(relayPath: string): Promise<void> {
   const path = settingsPath()
   const settings = await readSettings(path)
   if (hooksInstalled(settings, relayPath)) return
+  await backupOnce(path)
+  await writeSettings(path, installHooks(settings, relayPath))
+}
+
+/**
+ * On launch: bring an existing opt-in up to date (new relay path, new timeout).
+ * Does nothing for a user who never installed, or whose settings can't be read.
+ */
+export async function refreshAgentHooks(relayPath: string): Promise<void> {
+  const path = settingsPath()
+  const settings = await readSettings(path)
+  if (!wtermHooksPresent(settings) || hooksInstalled(settings, relayPath)) return
   await backupOnce(path)
   await writeSettings(path, installHooks(settings, relayPath))
 }

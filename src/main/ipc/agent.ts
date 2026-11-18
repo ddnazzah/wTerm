@@ -1,7 +1,7 @@
 import { ipcMain, type BrowserWindow } from 'electron'
 import { IPC, type AgentHooksStatus, type AutopilotSnapshot, type TerminalId } from '@shared/types'
 import { AgentHookServer } from '../agent/hook-server'
-import { hookStatus, installAgentHooks, removeAgentHooks } from '../agent/hook-install'
+import { hookStatus, installAgentHooks, refreshAgentHooks, removeAgentHooks } from '../agent/hook-install'
 import { Autopilot } from '../autopilot/autopilot'
 import { createClaudeRunner } from '../autopilot/supervisor'
 import { readTranscript } from '../autopilot/transcript'
@@ -50,10 +50,11 @@ export async function startAgentHooks(): Promise<void> {
   await hookServer.start()
   server = hookServer
 
-  // The relay path changes when wTerm is reinstalled elsewhere, so refresh an
-  // existing installation to point at the current script.
-  const status = await hookStatus(hookServer.relayPath())
-  if (status.installed) await installAgentHooks(hookServer.relayPath())
+  // The relay path changes when wTerm is reinstalled elsewhere, and entries from
+  // an older wTerm lack the Stop timeout Autopilot needs, so bring any existing
+  // opt-in up to date. Both read as "not installed" to hookStatus, which is why
+  // this keys off whether wTerm's entries are present at all.
+  await refreshAgentHooks(hookServer.relayPath())
 }
 
 export async function stopAgentHooks(): Promise<void> {
