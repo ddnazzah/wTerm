@@ -6,6 +6,7 @@ import { useUpdates } from '@renderer/state/updates'
 import { kbd } from '@renderer/lib/platform'
 import type { BridgePairing, BridgeStatus } from '@shared/types'
 import { AgentSignalsPane } from './settings/agent-signals-pane'
+import { useAutopilot } from '@renderer/state/autopilot'
 
 interface Props {
   open: boolean
@@ -109,7 +110,12 @@ export function SettingsModal({ open, onClose }: Props) {
             {active === 'formatting' && <FormattingPane />}
             {active === 'keybindings' && <KeybindingsPane />}
             {active === 'mobile' && <MobilePane />}
-            {active === 'agents' && <AgentSignalsPane />}
+            {active === 'agents' && (
+              <div className="flex flex-col gap-6">
+                <AgentSignalsPane />
+                <AutopilotPane />
+              </div>
+            )}
             {active === 'updates' && <UpdatesPane />}
             {active === 'about' && <AboutPane />}
           </div>
@@ -399,6 +405,46 @@ function MobilePane() {
         </>
       )}
     </Pane>
+  )
+}
+
+/**
+ * Whether Claude sessions answer their own stops. The default lives in main so
+ * it applies from the first hook after launch, before any window has loaded.
+ */
+function AutopilotPane() {
+  const [defaultOn, setDefaultOn] = useState<boolean | null>(null)
+  const refreshAll = useAutopilot((s) => s.refreshAll)
+
+  useEffect(() => {
+    let alive = true
+    void window.api.autopilot.getDefault().then((v) => alive && setDefaultOn(v))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const change = async (v: boolean): Promise<void> => {
+    setDefaultOn(await window.api.autopilot.setDefault(v))
+    await refreshAll()
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <BoolField
+        label="Autopilot for Claude sessions"
+        value={defaultOn ?? false}
+        onChange={(v) => void change(v)}
+      />
+      <p className="text-[12px] leading-relaxed text-foreground/55">
+        When a session stops to ask something with an obvious answer, Autopilot answers for
+        you with the recommended option and keeps it working toward what you asked for. It
+        reports once the goal is reached. It hands back to you for anything you didn&apos;t
+        authorise in your prompt: push, PR, merge, deletes, credentials, spending. It also
+        hands back after 25 replies, or when the session stops making progress. Needs the
+        Claude Code signals above. Switch it off per session with the AUTO tag in the sidebar.
+      </p>
+    </div>
   )
 }
 

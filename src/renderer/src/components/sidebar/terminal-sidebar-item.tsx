@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { TerminalRecord } from '@shared/types'
 import { ActivityDot } from '../activity-dot'
+import { AutopilotToggle } from './autopilot-toggle'
 import type { AttentionMeta } from '@renderer/state/store'
 
 interface Props {
@@ -133,6 +134,7 @@ export function TerminalSidebarItem({
           {displayName}
         </span>
       )}
+      <AutopilotToggle terminalId={terminal.id} />
       <button
         type="button"
         onClick={(e) => {

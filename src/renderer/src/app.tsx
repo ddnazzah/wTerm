@@ -24,6 +24,7 @@ import { closeProjectTerminal, createProjectTerminal, useWorkspace } from '@rend
 import { useGithub } from './state/github'
 import { BOARD_TAB_PATH, NOTES_TAB_PATH, TODOS_TAB_PATH } from '@renderer/lib/tab-uri'
 import { stripSpinner } from '@shared/terminal-title'
+import { useAutopilot } from '@renderer/state/autopilot'
 import { HOME_PROJECT_ID, type ActivityStatus, type Project, type TerminalRecord } from '@shared/types'
 
 export default function App() {
@@ -118,6 +119,9 @@ export default function App() {
     })
     return offExit
   }, [])
+
+  // Keep the sidebar's Autopilot tags in step with main.
+  useEffect(() => window.api.autopilot.onChanged((s) => useAutopilot.getState().put(s)), [])
 
   // Apply main-process activity detection to the sidebar indicators, and mark a
   // backgrounded session unread when it needs input or finishes a command.
