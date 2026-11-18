@@ -20,7 +20,7 @@ things the user's rules reserve for them.
 | How it is switched on | Setting `autopilot.defaultOn` (default **on** once hooks are installed) plus a per-session toggle. Nothing to re-enter per task. |
 | How a session is continued | Claude Code's own `Stop` hook contract: the hook answers `{"decision":"block","reason":"<reply>"}` and the agent carries on with `reason` as its next instruction. No keystrokes are typed into the PTY. |
 | Who decides | A supervisor: one headless `claude -p` call per stop, on the user's existing login. No API key to manage. |
-| What it never decides | Push, PR, merge, force-push, deleting branches/data, credentials, spending money, anything destructive or outward-facing. Those escalate. |
+| What it never decides on its own | Push, PR, merge, force-push, deleting branches/data, credentials, spending money, anything destructive or outward-facing — **unless the user's prompts in this session authorise that exact action** ("push when done" authorises a normal push; it does not authorise a force-push or a push to `main`). Unauthorised ones escalate. |
 
 ## Flow
 
@@ -65,7 +65,8 @@ Unreadable or missing file → error, which the supervisor treats as escalate.
 - The user's global `~/.claude/CLAUDE.md` still loads, which is the point: the
   supervisor decides by the same rules the user wrote for themselves.
 - Prompt: the goal (user prompts), the recent assistant output, the decision log so
-  far, and the escalation list above. It must return JSON:
+  far, and the escalation list above, with the rule that an action the user
+  authorised in their own prompts is not escalated — matched literally, never widened. It must return JSON:
   `{ action: "continue"|"done"|"escalate", reply: string, summary: string }`.
 - Output is schema-checked. Malformed output, non-zero exit, or timeout
   (`SUPERVISOR_TIMEOUT_S`) → **escalate**. The safe failure is "stop and tell the
@@ -107,6 +108,8 @@ Unit:
 - `supervisor` output parsing: valid verdicts, prose-wrapped JSON, wrong action,
   missing fields → escalate.
 - `policy`: cap reached, repeated reply, unchanged agent tail, reset on user prompt.
+- supervisor prompt fixtures: "push when done" → continue through a push; no mention → escalate;
+  "push" never authorises force-push or `main`.
 - `hook-settings`: Stop entry gets `timeout`; install stays idempotent; uninstall clean.
 
 Integration:
