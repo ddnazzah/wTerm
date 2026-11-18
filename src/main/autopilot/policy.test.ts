@@ -37,7 +37,8 @@ describe('applyPolicy', () => {
     const { verdict } = applyPolicy(state, go('Continue'), 'y')
 
     expect(verdict.action).toBe('escalate')
-    expect(verdict.reply).toBe('Continue')
+    expect(verdict.reply).toBe('')
+    expect(verdict.summary).toContain('repeat itself ("Continue")')
   })
 
   it('escalates when the agent stops on the identical message after a reply', () => {

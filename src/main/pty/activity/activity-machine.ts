@@ -114,7 +114,7 @@ export class ActivityMachine {
             hookDriven: true,
             status: 'attention',
             reason: 'turnDone',
-            detail: null,
+            detail: event.detail ?? null,
           },
           now
         )

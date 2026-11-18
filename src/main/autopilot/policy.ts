@@ -30,7 +30,8 @@ export interface PolicyResult {
   state: PilotState
 }
 
-const escalate = (summary: string, reply = ''): Verdict => ({ action: 'escalate', reply, summary })
+/** A policy stop has no question for the user, only the reason it stopped. */
+const escalate = (summary: string): Verdict => ({ action: 'escalate', reply: '', summary })
 
 export function applyPolicy(
   state: PilotState,
@@ -45,7 +46,7 @@ export function applyPolicy(
     return { verdict: escalate(`Autopilot stopped after ${max} replies without reaching the goal`), state: seen }
   }
   if (state.lastReply !== null && verdict.reply === state.lastReply) {
-    return { verdict: escalate('Autopilot was about to send the same reply twice', verdict.reply), state: seen }
+    return { verdict: escalate(`Autopilot was about to repeat itself ("${verdict.reply}")`), state: seen }
   }
   if (state.continuations > 0 && state.lastAssistant === lastAssistant) {
     return { verdict: escalate('The session stopped on the same message again — no progress'), state: seen }
