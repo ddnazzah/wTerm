@@ -25,8 +25,12 @@ export type AgentHookEvent =
   | { kind: 'promptSubmitted' }
   /** The agent is blocked on the user — a permission prompt or an idle nudge. */
   | { kind: 'needsInput'; message: string }
-  /** The agent finished its turn and is waiting for whatever comes next. */
-  | { kind: 'turnDone' }
+  /**
+   * The agent finished its turn and is waiting for whatever comes next.
+   * `detail` is set when wTerm itself has something to say about the stop —
+   * Autopilot's report, or the question it is handing back to the user.
+   */
+  | { kind: 'turnDone'; detail?: string }
   /** The agent session ended; the terminal is back to being a plain shell. */
   | { kind: 'sessionEnd' }
 
@@ -35,6 +39,8 @@ export interface AgentHookMessage {
   terminalId: string
   /** Claude's own session id, kept so a caller can find the transcript. */
   sessionId: string | null
+  /** The session's JSONL transcript, which Autopilot reads to decide a Stop. */
+  transcriptPath: string | null
   event: AgentHookEvent
 }
 
@@ -90,5 +96,10 @@ export function parseHookMessage(
   const event = toEvent(name, record)
   if (!event) return null
 
-  return { terminalId: target, sessionId: readString(record, 'session_id'), event }
+  return {
+    terminalId: target,
+    sessionId: readString(record, 'session_id'),
+    transcriptPath: readString(record, 'transcript_path'),
+    event,
+  }
 }

@@ -1,8 +1,12 @@
-import { ipcMain } from 'electron'
-import { IPC, type AgentHooksStatus } from '@shared/types'
+import { ipcMain, type BrowserWindow } from 'electron'
+import { IPC, type AgentHooksStatus, type AutopilotSnapshot, type TerminalId } from '@shared/types'
 import { AgentHookServer } from '../agent/hook-server'
-import { hookStatus, installAgentHooks, removeAgentHooks } from '../agent/hook-install'
+import { hookStatus, installAgentHooks, refreshAgentHooks, removeAgentHooks } from '../agent/hook-install'
+import { Autopilot } from '../autopilot/autopilot'
+import { createClaudeRunner, stopAllSupervisors } from '../autopilot/supervisor'
+import { createTranscriptReader } from '../autopilot/transcript'
 import type { PtyManager } from '../pty/manager'
+import { getState, mutate } from '../store/state'
 
 // Agent signals: the loopback listener plus the settings toggle behind it.
 //
@@ -13,20 +17,55 @@ import type { PtyManager } from '../pty/manager'
 // titles, which is a guess rather than the agent's own word.
 
 let server: AgentHookServer | null = null
+let autopilot: Autopilot | null = null
 
-export async function startAgentHooks(pty: PtyManager): Promise<void> {
+/** Autopilot is on for new sessions unless the user has turned it off. */
+function storedDefault(): boolean {
+  return getState().autopilotDefaultOn ?? true
+}
+
+function createAutopilot(pty: PtyManager, getWindow: () => BrowserWindow | null): Autopilot {
+  const send = (snapshot: AutopilotSnapshot): void => {
+    const win = getWindow()
+    if (win && !win.isDestroyed()) win.webContents.send(IPC.autopilot.changed, snapshot)
+  }
+  const pilot = new Autopilot(
+    {
+      decide: createClaudeRunner(),
+      read: createTranscriptReader(),
+      apply: (id, event) => pty.applyAgentEvent(id, event),
+      changed: send,
+    },
+    storedDefault()
+  )
+  pty.addSink({ onExit: ({ id }) => pilot.forget(id) })
+  return pilot
+}
+
+/** Only ids of terminals that exist may be toggled or queried. */
+function assertTerminal(pty: PtyManager, id: unknown): asserts id is TerminalId {
+  if (typeof id !== 'string' || !pty.has(id)) throw new Error('unknown terminal')
+}
+
+export async function startAgentHooks(): Promise<void> {
+  const pilot = autopilot
+  if (!pilot) throw new Error('registerAgentIpc must run before startAgentHooks')
   const hookServer = new AgentHookServer()
-  hookServer.onMessage((message) => pty.applyAgentEvent(message.terminalId, message.event))
+  // Every event goes through Autopilot, which passes all but the Stops it is
+  // deciding straight to the activity machine.
+  hookServer.onMessage((message) => pilot.handle(message))
   await hookServer.start()
   server = hookServer
 
-  // The relay path changes when wTerm is reinstalled elsewhere, so refresh an
-  // existing installation to point at the current script.
-  const status = await hookStatus(hookServer.relayPath())
-  if (status.installed) await installAgentHooks(hookServer.relayPath())
+  // The relay path changes when wTerm is reinstalled elsewhere, and entries from
+  // an older wTerm lack the Stop timeout Autopilot needs, so bring any existing
+  // opt-in up to date. Both read as "not installed" to hookStatus, which is why
+  // this keys off whether wTerm's entries are present at all.
+  await refreshAgentHooks(hookServer.relayPath())
 }
 
 export async function stopAgentHooks(): Promise<void> {
+  stopAllSupervisors()
   await server?.stop()
   server = null
 }
@@ -39,8 +78,31 @@ async function currentStatus(): Promise<AgentHooksStatus> {
   return { ...status, listening: true }
 }
 
-export function registerAgentIpc(): void {
+export function registerAgentIpc(pty: PtyManager, getWindow: () => BrowserWindow | null): void {
+  const pilot = createAutopilot(pty, getWindow)
+  autopilot = pilot
+
   ipcMain.handle(IPC.agent.status, (): Promise<AgentHooksStatus> => currentStatus())
+
+  ipcMain.handle(IPC.autopilot.snapshot, (_e, id: unknown): AutopilotSnapshot => {
+    assertTerminal(pty, id)
+    return pilot.snapshot(id)
+  })
+  ipcMain.handle(IPC.autopilot.setEnabled, (_e, id: unknown, enabled: unknown): AutopilotSnapshot => {
+    assertTerminal(pty, id)
+    if (typeof enabled !== 'boolean') throw new Error('invalid autopilot toggle')
+    pilot.setEnabled(id, enabled)
+    return pilot.snapshot(id)
+  })
+  ipcMain.handle(IPC.autopilot.getDefault, (): boolean => storedDefault())
+  ipcMain.handle(IPC.autopilot.setDefault, (_e, enabled: boolean): boolean => {
+    if (typeof enabled !== 'boolean') throw new Error('invalid autopilot default')
+    mutate((draft) => {
+      draft.autopilotDefaultOn = enabled
+    })
+    pilot.setDefault(enabled)
+    return enabled
+  })
 
   ipcMain.handle(IPC.agent.install, async (): Promise<AgentHooksStatus> => {
     if (!server) throw new Error('agent hook listener is not running')

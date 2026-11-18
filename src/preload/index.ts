@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import {
   IPC,
   type AgentHooksStatus,
+  type AutopilotSnapshot,
   type AppState,
   type BoardSettings,
   type BoardSnapshot,
@@ -188,6 +189,20 @@ const api = {
     getHooksStatus: (): Promise<AgentHooksStatus> => ipcRenderer.invoke(IPC.agent.status),
     installHooks: (): Promise<AgentHooksStatus> => ipcRenderer.invoke(IPC.agent.install),
     uninstallHooks: (): Promise<AgentHooksStatus> => ipcRenderer.invoke(IPC.agent.uninstall),
+  },
+  autopilot: {
+    snapshot: (id: TerminalId): Promise<AutopilotSnapshot> =>
+      ipcRenderer.invoke(IPC.autopilot.snapshot, id),
+    setEnabled: (id: TerminalId, enabled: boolean): Promise<AutopilotSnapshot> =>
+      ipcRenderer.invoke(IPC.autopilot.setEnabled, id, enabled),
+    getDefault: (): Promise<boolean> => ipcRenderer.invoke(IPC.autopilot.getDefault),
+    setDefault: (enabled: boolean): Promise<boolean> =>
+      ipcRenderer.invoke(IPC.autopilot.setDefault, enabled),
+    onChanged: (cb: (snapshot: AutopilotSnapshot) => void): (() => void) => {
+      const listener = (_: unknown, snapshot: AutopilotSnapshot) => cb(snapshot)
+      ipcRenderer.on(IPC.autopilot.changed, listener)
+      return () => ipcRenderer.off(IPC.autopilot.changed, listener)
+    },
   },
   system: {
     getVersion: (): Promise<string> => ipcRenderer.invoke(IPC.system.version),

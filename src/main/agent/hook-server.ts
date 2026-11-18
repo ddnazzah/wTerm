@@ -21,14 +21,29 @@ const MAX_BODY_BYTES = 64 * 1024
 const TERMINAL_HEADER = 'x-wterm-terminal'
 const TOKEN_HEADER = 'x-wterm-token'
 
-export type HookMessageHandler = (message: AgentHookMessage) => void
+/**
+ * Called for every well-formed hook event. Returning nothing answers the hook
+ * at once with no output. Returning a promise holds the hook open until it
+ * settles: a string is printed by the relay as the hook's output (Claude reads a
+ * Stop hook's JSON output as its decision), null lets the hook finish silently.
+ */
+export type HookMessageHandler = (message: AgentHookMessage) => Promise<string | null> | void
+
+/**
+ * How long the relay waits on a held hook. Longer than the Autopilot supervisor's
+ * own limit, shorter than the Stop hook timeout Claude enforces
+ * (STOP_HOOK_TIMEOUT_S), so whichever side gives up, it is never Claude killing a
+ * hook that still had an answer coming.
+ */
+const RELAY_TIMEOUT_S = 135
 
 /**
  * The shell wTerm asks Claude to run on each hook.
  *
- * It must print absolutely nothing: a `UserPromptSubmit` hook's stdout is fed
- * back into the agent's prompt as context, so a stray curl progress line would
- * end up inside the user's conversation. It must also never fail: a non-zero
+ * It prints only the server's response body, which is empty for everything but
+ * a Stop that Autopilot holds: a `UserPromptSubmit` hook's stdout is fed back
+ * into the agent's prompt as context, so a stray curl progress line would end up
+ * inside the user's conversation. It must also never fail: a non-zero
  * exit from a hook is surfaced to the user as an error, and wTerm being closed
  * is not an error worth interrupting an agent over.
  */
@@ -39,14 +54,16 @@ function relayScript(port: number, token: string): string {
 # Claude pipes the hook payload in on stdin; this forwards it verbatim to wTerm,
 # naming the terminal from the environment wTerm exported into the PTY.
 #
-# Prints nothing (a UserPromptSubmit hook's stdout is injected into the prompt)
-# and always exits 0 (a failed hook is shown to the user as an error).
-curl -s -m 2 -o /dev/null \\
+# Prints only what wTerm answers with, and wTerm answers with a body only for a
+# Stop that Autopilot is deciding (a UserPromptSubmit hook's stdout is injected
+# into the prompt, so it must stay empty). Always exits 0: a failed hook is shown
+# to the user as an error, and wTerm being closed is not one.
+curl -sf -m ${RELAY_TIMEOUT_S} \\
   -X POST 'http://127.0.0.1:${port}/hook' \\
   -H 'content-type: application/json' \\
   -H '${TOKEN_HEADER}: ${token}' \\
   -H "${TERMINAL_HEADER}: \${WTERM_TERMINAL_ID:-}" \\
-  --data-binary @- >/dev/null 2>&1
+  --data-binary @- 2>/dev/null
 exit 0
 `
 }
@@ -68,7 +85,7 @@ export class AgentHookServer {
     return join(app.getPath('userData'), 'agent-hook.sh')
   }
 
-  /** Called for every well-formed hook event. */
+  /** Called for every well-formed hook event; see HookMessageHandler. */
   onMessage(handler: HookMessageHandler): void {
     this.handler = handler
   }
@@ -118,17 +135,24 @@ export class AgentHookServer {
     }
 
     const body = await readBody(req)
-    // Answer before doing anything with the payload: the agent is blocked on
-    // this request finishing, so it should never wait on wTerm's own work.
-    res.writeHead(204).end()
-
     const terminalId = (req.headers[TERMINAL_HEADER] as string | undefined) ?? null
     const message = parseHookMessage(body, terminalId)
-    if (!message) return
+    // The agent is blocked until this request finishes. Only a handler that
+    // explicitly holds the event (Autopilot deciding a Stop) keeps it waiting.
+    const reply = message ? await this.dispatch(message) : null
+    if (reply === null) {
+      res.writeHead(204).end()
+      return
+    }
+    res.writeHead(200, { 'content-type': 'application/json' }).end(reply)
+  }
+
+  private async dispatch(message: AgentHookMessage): Promise<string | null> {
     try {
-      this.handler?.(message)
+      return (await this.handler?.(message)) ?? null
     } catch (err) {
       console.error('[agent-hook] handler failed', err)
+      return null
     }
   }
 }

@@ -133,6 +133,17 @@ describe('ActivityMachine — agent hooks', () => {
     expect(done.reason).toBe('turnDone')
   })
 
+  it('carries a finished turn\'s detail, so Autopilot\'s report reaches the indicator', () => {
+    const m = new ActivityMachine()
+    m.applyAgent({ kind: 'needsInput', message: 'old question' }, 0)
+
+    const done = m.applyAgent({ kind: 'turnDone', detail: 'Goal reached: export shipped' }, 10)
+    expect(done.detail).toBe('Goal reached: export shipped')
+
+    // A plain Stop must not keep a stale detail from an earlier state.
+    expect(m.applyAgent({ kind: 'turnDone' }, 20).detail).toBeNull()
+  })
+
   it('raises attention on a finished turn even without a preceding prompt', () => {
     // A resumed session's first hook can be the Stop of a turn wTerm never saw
     // start; it still needs the user.
