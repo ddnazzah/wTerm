@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.0
+
+### Added
+
+- **Autopilot**: a Claude session no longer sits idle waiting on a question with an
+  obvious answer. When it stops, Autopilot reads what you asked for and answers the
+  way you would: it takes the recommended option and keeps the session working until
+  the goal is met, then notifies you once with a report. It hands back to you for
+  anything your prompt didn't authorise (push, PR, merge, deletes, credentials,
+  spending), after 25 replies, or when the session stops making progress. "Push when
+  done" in your prompt counts as approval for a normal push. Every session has an
+  `AUTO` tag in the sidebar to switch it off, and its tooltip lists what was chosen
+  for you. Needs Claude Code signals (Settings → Agents); an existing install is
+  updated automatically on first launch.
+- **Changes and Files in one panel**: the Files and Source control buttons are now
+  one right panel with a Changes | Files tab strip. Changes comes first, shows how
+  many files differ, and on a clean tree offers Open Files and Search in Files.
+
 ## 0.8.2
 
 ### Fixed
