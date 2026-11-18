@@ -93,7 +93,7 @@ lives in main's persisted state so it applies from the first hook after launch.
   indicator and OS notification carry the report.
 - **Escalate** → a `turnDone` with `detail` "Autopilot needs you: <question>".
 - Renderer: Autopilot is drawn on the session's status dot, not as a separate tag: a
-  thin accent ring while on, a spinning arc while the supervisor decides (snapshot
+  dotted accent ring while on (dotted so it never reads as the solid working ring), a spinning arc while the supervisor decides (snapshot
   `deciding`), nothing while off. The dot's tooltip names the last decision;
   right-clicking the row toggles Autopilot and lists recent decisions. A switch for
   the default under Settings → Agents.

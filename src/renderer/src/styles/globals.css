@@ -160,8 +160,10 @@ body {
   border-radius: 9999px;
 }
 
+/* Dotted, so it never reads as the solid "working" ring on the dot itself. */
 .autopilot-ring--on {
-  border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+  border-style: dotted;
+  border-color: color-mix(in oklab, var(--accent) 80%, transparent);
 }
 
 .autopilot-ring--deciding {
