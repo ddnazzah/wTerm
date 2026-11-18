@@ -149,6 +149,39 @@ body {
   box-shadow: 0 0 0 2px color-mix(in oklab, #b91c1c 35%, transparent);
 }
 
+/* Autopilot ring around a session's dot. Always reserves its 1px border and
+   1px gap so turning Autopilot on or off never shifts the row. While the
+   supervisor decides, the ring opens into an arc and spins. */
+.autopilot-ring {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 1px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+}
+
+.autopilot-ring--on {
+  border-color: color-mix(in oklab, var(--accent) 70%, transparent);
+}
+
+.autopilot-ring--deciding {
+  border-color: var(--accent);
+  border-top-color: transparent;
+  animation: autopilot-spin 0.9s linear infinite;
+}
+
+@keyframes autopilot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autopilot-ring--deciding {
+    animation: none;
+  }
+}
+
 @keyframes activity-halo {
   0%,
   100% {

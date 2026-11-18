@@ -442,7 +442,7 @@ function AutopilotPane() {
         reports once the goal is reached. It hands back to you for anything you didn&apos;t
         authorise in your prompt: push, PR, merge, deletes, credentials, spending. It also
         hands back after 25 replies, or when the session stops making progress. Needs the
-        Claude Code signals above. Switch it off per session with the AUTO tag in the sidebar.
+        Claude Code signals above. Right-click a session in the sidebar to switch it per session; a ring around its dot means it is on.
       </p>
     </div>
   )

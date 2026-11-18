@@ -11,6 +11,7 @@ import { STATUS_BADGE, folderDecoration } from '@renderer/lib/git-decoration'
 import { sliceStatusForRepo } from '@renderer/lib/repo-status'
 import { ChangesList } from './changes-list'
 import { CollapsibleSection } from './collapsible-section'
+import { ContextMenu, MenuDivider, MenuItem } from '../context-menu'
 
 interface Props {
   project: Project
@@ -601,7 +602,7 @@ export function FileTree({ project }: Props) {
       </div>
 
       {menu && (
-        <ContextMenu
+        <FileMenu
           x={menu.x}
           y={menu.y}
           target={menu.target}
@@ -964,7 +965,7 @@ interface MenuState {
   target: FsEntry | null
 }
 
-function ContextMenu({
+function FileMenu({
   x,
   y,
   target,
@@ -980,24 +981,8 @@ function ContextMenu({
   onClose: () => void
   onAction: (a: ActionKey) => void
 }) {
-  useEffect(() => {
-    const handler = () => onClose()
-    window.addEventListener('click', handler)
-    window.addEventListener('blur', handler)
-    return () => {
-      window.removeEventListener('click', handler)
-      window.removeEventListener('blur', handler)
-    }
-  }, [onClose])
-
   return (
-    <div
-      role="menu"
-      className="fixed z-50 min-w-44 rounded-lg border border-foreground/15 bg-background/95 backdrop-blur shadow-xl py-1 text-[13px]"
-      style={{ top: y, left: x }}
-      onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.preventDefault()}
-    >
+    <ContextMenu x={x} y={y} onClose={onClose}>
       {target && !target.isDirectory && (
         <>
           <MenuItem onClick={() => onAction('open')}>Open</MenuItem>
@@ -1030,37 +1015,8 @@ function ContextMenu({
           <MenuItem onClick={() => onAction('open-terminal')}>New terminal here</MenuItem>
         </>
       )}
-    </div>
+    </ContextMenu>
   )
-}
-
-function MenuItem({
-  onClick,
-  children,
-  danger,
-}: {
-  onClick: () => void
-  children: React.ReactNode
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        'flex items-center w-full px-3 py-1.5 text-left transition-colors',
-        danger
-          ? 'text-red-400 hover:bg-red-500/15'
-          : 'text-foreground/85 hover:bg-foreground/10',
-      ].join(' ')}
-    >
-      {children}
-    </button>
-  )
-}
-
-function MenuDivider() {
-  return <div className="my-1 mx-2 h-px bg-foreground/10" />
 }
 
 function parentOf(p: string): string {

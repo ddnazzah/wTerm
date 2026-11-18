@@ -45,6 +45,8 @@ export class Autopilot {
    * to a different generation is stale and dropped.
    */
   private readonly generations = new Map<string, number>()
+  /** The generation each session's in-flight supervisor call belongs to. */
+  private readonly deciding = new Map<string, number>()
 
   constructor(
     private readonly deps: AutopilotDeps,
@@ -71,6 +73,7 @@ export class Autopilot {
     this.overrides.delete(terminalId)
     this.sessions.delete(terminalId)
     this.generations.delete(terminalId)
+    this.deciding.delete(terminalId)
   }
 
   snapshot(terminalId: string): AutopilotSnapshot {
@@ -78,6 +81,7 @@ export class Autopilot {
     return {
       terminalId,
       enabled: this.isEnabled(terminalId),
+      deciding: this.isDeciding(terminalId),
       continuations: session.state.continuations,
       log: [...session.log],
     }
@@ -101,22 +105,26 @@ export class Autopilot {
    * it is the report of what was done on the user's behalf.
    */
   private userTookTurn(terminalId: string): void {
+    const wasDeciding = this.isDeciding(terminalId)
     this.bump(terminalId)
     const session = this.sessions.get(terminalId)
-    if (!session) return
-    this.sessions.set(terminalId, { ...session, state: INITIAL_PILOT_STATE })
-    this.emit(terminalId)
+    if (session) this.sessions.set(terminalId, { ...session, state: INITIAL_PILOT_STATE })
+    if (session || wasDeciding) this.emit(terminalId)
   }
 
   private async decideStop(message: AgentHookMessage): Promise<string | null> {
     const { terminalId } = message
     const generation = this.bump(terminalId)
+    this.deciding.set(terminalId, generation)
+    this.emit(terminalId)
     const before = this.sessions.get(terminalId) ?? blankSession()
     const { verdict: proposed, lastAssistant } = await this.consult(message.transcriptPath, before.log)
+    if (this.deciding.get(terminalId) === generation) this.deciding.delete(terminalId)
 
     if (this.generations.get(terminalId) !== generation) return null // overtaken; the hook is gone
     if (!this.isEnabled(terminalId)) {
       // Switched off while deciding: behave as if Autopilot had never held it.
+      this.emit(terminalId)
       this.deps.apply(terminalId, message.event)
       return null
     }
@@ -165,6 +173,12 @@ export class Autopilot {
         : `Autopilot needs you: ${verdict.reply || verdict.summary}`
     this.deps.apply(terminalId, { kind: 'turnDone', detail })
     return null
+  }
+
+  /** Only the newest stop counts: an overtaken call no longer speaks for the session. */
+  private isDeciding(terminalId: string): boolean {
+    const generation = this.deciding.get(terminalId)
+    return generation !== undefined && generation === this.generations.get(terminalId)
   }
 
   private bump(terminalId: string): number {

@@ -354,6 +354,8 @@ export type AutopilotDecision = {
 export type AutopilotSnapshot = {
   terminalId: TerminalId
   enabled: boolean
+  /** The supervisor is choosing a reply to the session's latest stop. */
+  deciding: boolean
   /** Replies sent since the user last typed. */
   continuations: number
   /** Every decision made on the user's behalf, oldest first. */

@@ -221,6 +221,62 @@ describe('Autopilot — decisions overtaken while the supervisor thinks', () => 
     expect(h.pilot.snapshot(TERM).continuations).toBe(1)
   })
 
+  it('reports deciding while the supervisor thinks, and clears it when it answers', async () => {
+    const { h, release } = gated()
+    const pending = h.pilot.handle(stop())
+    await tick()
+
+    expect(h.snapshots.at(-1)?.deciding).toBe(true)
+    expect(h.pilot.snapshot(TERM).deciding).toBe(true)
+
+    release(cli({ action: 'continue', reply: 'go', summary: 's' }))
+    await pending
+
+    expect(h.snapshots.at(-1)?.deciding).toBe(false)
+    expect(h.pilot.snapshot(TERM).deciding).toBe(false)
+  })
+
+  it('stops reporting deciding the moment the user types over a pending decision', async () => {
+    const { h, release } = gated()
+    const pending = h.pilot.handle(stop())
+    await tick()
+
+    h.pilot.handle(msg({ kind: 'promptSubmitted' }))
+
+    expect(h.snapshots.at(-1)?.deciding).toBe(false)
+    release(cli({ action: 'done', reply: '', summary: 'stale' }))
+    await pending
+    expect(h.pilot.snapshot(TERM).deciding).toBe(false)
+  })
+
+  it('clears deciding when switched off mid-decision', async () => {
+    const { h, release } = gated()
+    const pending = h.pilot.handle(stop())
+    await tick()
+    h.pilot.setEnabled(TERM, false)
+
+    release(cli({ action: 'continue', reply: 'keep going', summary: 's' }))
+    await pending
+
+    expect(h.snapshots.at(-1)).toMatchObject({ enabled: false, deciding: false })
+  })
+
+  it('keeps deciding on while the newer of two overlapping stops is still out', async () => {
+    const { h, release } = gated()
+    const first = h.pilot.handle(stop())
+    await tick()
+    const second = h.pilot.handle(stop())
+    await tick()
+
+    release(cli({ action: 'continue', reply: 'late', summary: 's' }), 0)
+    await first
+
+    expect(h.pilot.snapshot(TERM).deciding).toBe(true)
+    release(cli({ action: 'continue', reply: 'fresh', summary: 's' }), 1)
+    await second
+    expect(h.pilot.snapshot(TERM).deciding).toBe(false)
+  })
+
   it('forgets a closed terminal entirely', async () => {
     const h = harness({ defaultOn: true })
     h.pilot.setEnabled(TERM, false)
@@ -249,7 +305,7 @@ describe('Autopilot — the user taking the wheel', () => {
 
     h.pilot.setEnabled(TERM, false)
 
-    expect(h.snapshots.at(-1)).toEqual({ terminalId: TERM, enabled: false, continuations: 0, log: [] })
+    expect(h.snapshots.at(-1)).toEqual({ terminalId: TERM, enabled: false, deciding: false, continuations: 0, log: [] })
   })
 
   it('keeps the report when a session ends, but resets its counters', async () => {

@@ -7,6 +7,7 @@ import {
   isPulsing,
   type IndicatorState,
 } from '@renderer/lib/terminal-indicator'
+import type { AutopilotMode } from '@renderer/lib/autopilot-label'
 
 /**
  * The one dot that says what a terminal is doing. Every place that shows
@@ -24,9 +25,16 @@ interface Props {
   meta?: AttentionMeta
   /** Size classes; defaults to the sidebar's 8px dot. */
   className?: string
+  /**
+   * When given, the dot sits inside an Autopilot ring: accent while on, spinning
+   * while it decides, invisible (but still taking its space) while off.
+   */
+  autopilot?: AutopilotMode
+  /** Extra tooltip line, e.g. the Autopilot summary. */
+  note?: string
 }
 
-export function ActivityDot({ busy, attention, unread, meta, className = 'w-2 h-2' }: Props) {
+export function ActivityDot({ busy, attention, unread, meta, className = 'w-2 h-2', autopilot, note }: Props) {
   const now = useNow(AGE_TICK_MS)
   const state = indicatorState({
     busy,
@@ -36,9 +44,9 @@ export function ActivityDot({ busy, attention, unread, meta, className = 'w-2 h-
     changedAt: meta?.changedAt ?? 0,
     now,
   })
-  const label = indicatorLabel(state, meta?.detail ?? null)
+  const label = [indicatorLabel(state, meta?.detail ?? null), note].filter(Boolean).join(' · ')
 
-  return (
+  const dot = (
     <span
       className={[
         'activity-dot inline-block rounded-full flex-shrink-0',
@@ -53,6 +61,8 @@ export function ActivityDot({ busy, attention, unread, meta, className = 'w-2 h-
       aria-hidden={label ? undefined : true}
     />
   )
+  if (!autopilot) return dot
+  return <span className={`autopilot-ring autopilot-ring--${autopilot}`}>{dot}</span>
 }
 
 /**
