@@ -47,10 +47,16 @@ function toVerdict(value: unknown): Verdict | null {
   if (typeof value !== 'object' || value === null) return null
   const v = value as Record<string, unknown>
   if (typeof v.action !== 'string' || !ACTIONS.has(v.action)) return null
-  if (typeof v.summary !== 'string' || v.summary.trim().length === 0) return null
   const reply = typeof v.reply === 'string' ? v.reply.trim() : ''
-  if (v.action === 'continue' && (reply.length === 0 || reply.length > REPLY_MAX_CHARS)) return null
-  return { action: v.action as VerdictAction, reply, summary: v.summary.trim() }
+  const summary = typeof v.summary === 'string' ? v.summary.trim() : ''
+  if (v.action === 'continue') {
+    if (reply.length === 0 || reply.length > REPLY_MAX_CHARS) return null
+    // The reply is the record of a continue; a summary is optional.
+    return { action: 'continue', reply, summary: summary || reply }
+  }
+  // A stop is what the user reads, so it must say something.
+  if (summary.length === 0) return null
+  return { action: v.action as VerdictAction, reply, summary }
 }
 
 /**

@@ -85,13 +85,16 @@ Applied to the supervisor's verdict before it is acted on:
 
 Per terminal: `enabled`, `continuations`, and the decision log
 (`{ at, action, reply, summary }`). In memory, keyed by terminal id; lost on restart
-is acceptable for v1.
+is acceptable for v1. A user prompt or a session end resets the counters but keeps
+the log — the log is the report. The default (`autopilotDefaultOn`, missing = on)
+lives in main's persisted state so it applies from the first hook after launch.
 
-- **Done** → OS notification "Goal reached: <summary>" and the log is the report.
-- **Escalate** → existing `attention` indicator with `detail` = the open question.
-- Renderer: an Autopilot badge on the session row, the toggle in its context menu,
-  and a popover listing the decision log, so every choice made on the user's behalf
-  is visible after the fact.
+- **Done** → a `turnDone` with `detail` "Goal reached: <summary>", so the existing
+  indicator and OS notification carry the report.
+- **Escalate** → a `turnDone` with `detail` "Autopilot needs you: <question>".
+- Renderer: an `AUTO` tag on each session row (always shown while on, on hover while
+  off) that toggles it, whose tooltip lists recent decisions; a switch for the default
+  under Settings → Agents.
 
 ## Not in scope (v1)
 

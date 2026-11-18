@@ -32,6 +32,15 @@ describe('buildSupervisorPrompt', () => {
     expect(prompt).toMatch(/does NOT allow a force-push or a push to main/)
   })
 
+  it('tells the supervisor that questions addressed to the user are its to answer', () => {
+    // Measured against a real session: without this, "ask me first" made the
+    // supervisor hand back an ordinary recommend-yes question.
+    const prompt = buildSupervisorPrompt(view, [])
+
+    expect(prompt).toMatch(/You ARE the user's stand-in/)
+    expect(prompt).toMatch(/never just because the agent asked/)
+  })
+
   it('includes only the newest earlier decisions, so the prompt stays bounded', () => {
     const log: AutopilotDecision[] = Array.from({ length: 30 }, (_, i) => ({
       at: i,

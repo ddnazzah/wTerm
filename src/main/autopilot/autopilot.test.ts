@@ -191,13 +191,15 @@ describe('Autopilot — the user taking the wheel', () => {
     expect(h.snapshots.at(-1)).toEqual({ terminalId: TERM, enabled: false, continuations: 0, log: [] })
   })
 
-  it('forgets a session when it ends', async () => {
+  it('keeps the report when a session ends, but resets its counters', async () => {
+    // A headless or quickly-exited session ends right after its last Stop; the
+    // log is the user's report and must survive that.
     const h = harness({ outputs: [cli({ action: 'continue', reply: 'x', summary: 's' })] })
     await h.pilot.handle(stop())
 
     h.pilot.handle(msg({ kind: 'sessionEnd' }))
 
     expect(h.pilot.snapshot(TERM).continuations).toBe(0)
-    expect(h.pilot.snapshot(TERM).log).toEqual([])
+    expect(h.pilot.snapshot(TERM).log.map((d) => d.reply)).toEqual(['x'])
   })
 })

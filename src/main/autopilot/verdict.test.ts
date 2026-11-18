@@ -38,9 +38,21 @@ describe('parseVerdict', () => {
     expect(parseVerdict(out)?.action).toBe('escalate')
   })
 
+  it('accepts a continue with an empty summary, using the reply as its record', () => {
+    // Measured: the real supervisor often leaves summary "" on a continue.
+    const text = verdictJson({ action: 'continue', reply: 'Yes, create b.txt.', summary: '' })
+
+    expect(parseVerdict(envelope(text))).toEqual({
+      action: 'continue',
+      reply: 'Yes, create b.txt.',
+      summary: 'Yes, create b.txt.',
+    })
+  })
+
   it.each([
     ['an unknown action', { action: 'maybe', reply: 'x', summary: 's' }],
-    ['a missing summary', { action: 'done', reply: '' }],
+    ['a done with no summary', { action: 'done', reply: '' }],
+    ['an escalate with a blank summary', { action: 'escalate', reply: 'q?', summary: ' ' }],
     ['a continue with no reply', { action: 'continue', reply: '  ', summary: 's' }],
     ['a continue whose reply is an essay', { action: 'continue', reply: 'x'.repeat(REPLY_MAX_CHARS + 1), summary: 's' }],
   ])('rejects %s', (_label, value) => {

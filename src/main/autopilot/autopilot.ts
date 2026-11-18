@@ -76,11 +76,15 @@ export class Autopilot {
     const { terminalId, event } = message
     if (event.kind === 'turnDone' && this.isEnabled(terminalId)) return this.decideStop(message)
     if (event.kind === 'promptSubmitted') this.userTookTurn(terminalId)
-    if (event.kind === 'sessionEnd') this.sessions.delete(terminalId)
+    if (event.kind === 'sessionEnd') this.userTookTurn(terminalId)
     this.deps.apply(terminalId, event)
   }
 
-  /** A new prompt from the user is a new or refined goal: fresh counters, same log. */
+  /**
+   * A new prompt from the user is a new or refined goal; an ended session will
+   * start a fresh one. Either way: fresh counters, but the log is kept, because
+   * it is the report of what was done on the user's behalf.
+   */
   private userTookTurn(terminalId: string): void {
     const session = this.sessions.get(terminalId)
     if (!session) return
