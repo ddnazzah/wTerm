@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GitFileStatusMap, GitInfo, Project, RepoRef } from '@shared/types'
+import { changedFileCount, type RightSidebarTab } from '@renderer/lib/right-panel'
 import { sliceStatusForRepo } from '@renderer/lib/repo-status'
 import { useGithub } from '@renderer/state/github'
 import { PrSection } from './pr-section'
@@ -8,9 +9,13 @@ import { RunsSection } from './runs-section'
 
 interface Props {
   project: Project
+  /** Every status read, so the Changes tab's count follows commits and discards. */
+  onStatus: (status: GitFileStatusMap) => void
+  /** Switch the panel to another tab, for the clean-tree shortcuts. */
+  onShowTab: (tab: RightSidebarTab) => void
 }
 
-export function GitPanel({ project }: Props) {
+export function GitPanel({ project, onStatus, onShowTab }: Props) {
   const settings = useGithub((s) => s.settings)
   const [repos, setRepos] = useState<RepoRef[] | null>(null)
   const [infos, setInfos] = useState<Record<string, GitInfo>>({})
@@ -33,8 +38,9 @@ export function GitPanel({ project }: Props) {
     setRepos(list)
     setInfos(Object.fromEntries(list.map((r, i) => [r.rel, infoList[i]!])))
     setStatusMap(status)
+    onStatus(status)
     setActiveRel((cur) => (list.some((r) => r.rel === cur) ? cur : (list[0]?.rel ?? '')))
-  }, [project.id])
+  }, [project.id, onStatus])
 
   useEffect(() => {
     epochRef.current += 1
@@ -115,6 +121,7 @@ export function GitPanel({ project }: Props) {
           onRefresh={() => void reloadAll()}
         />
       ))}
+      {changedFileCount(statusMap) === 0 && <NoChanges onShowTab={onShowTab} />}
       {settings.hasToken && activeInfo?.githubRepo ? (
         <>
           <PrSection
@@ -148,5 +155,29 @@ export function GitPanel({ project }: Props) {
         </div>
       ) : null}
     </div>
+  )
+}
+
+function NoChanges({ onShowTab }: { onShowTab: (tab: RightSidebarTab) => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-8 border-b border-accent/7">
+      <div className="text-[13px] text-foreground/80">No changed files</div>
+      <div className="flex flex-col gap-1 w-full max-w-[240px]">
+        <ShortcutLink label="Open Files" onClick={() => onShowTab('files')} />
+        <ShortcutLink label="Search in Files" onClick={() => onShowTab('search')} />
+      </div>
+    </div>
+  )
+}
+
+function ShortcutLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="px-2 py-1 rounded text-left text-[12px] text-accent hover:bg-foreground/5"
+    >
+      {label}
+    </button>
   )
 }

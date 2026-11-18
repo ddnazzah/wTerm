@@ -22,6 +22,7 @@ export interface AttentionMeta {
 }
 import { useSettings } from './settings'
 import { modalSizeFor, clampModalSize } from '@renderer/lib/modal-size'
+import { parseRightSidebarTab, type RightSidebarTab } from '@renderer/lib/right-panel'
 
 export const SIDEBAR_MIN_WIDTH = 180
 export const SIDEBAR_MAX_WIDTH = 480
@@ -75,7 +76,7 @@ const readInitialFileModalSize = (): { width: number; height: number } => {
   return modalSizeFor({ width: window.innerWidth, height: window.innerHeight }, saved)
 }
 
-export type RightSidebarTab = 'files' | 'git' | 'search'
+export type { RightSidebarTab }
 
 export interface OpenedFile {
   projectId: string
@@ -171,10 +172,9 @@ const readInitialBottomPanelOpen = (): boolean => {
 
 const readInitialRightSidebarTab = (): RightSidebarTab => {
   try {
-    const raw = localStorage.getItem(RIGHT_SIDEBAR_TAB_KEY)
-    return raw === 'git' || raw === 'search' ? raw : 'files'
+    return parseRightSidebarTab(localStorage.getItem(RIGHT_SIDEBAR_TAB_KEY))
   } catch {
-    return 'files'
+    return parseRightSidebarTab(null)
   }
 }
 

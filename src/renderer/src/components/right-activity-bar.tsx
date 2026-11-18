@@ -1,6 +1,7 @@
 import { useState, type FocusEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { useWorkspace, type RightSidebarTab } from '@renderer/state/store'
+import { useWorkspace } from '@renderer/state/store'
+import { clickPanelButton, isPanelButtonActive, type PanelButton } from '@renderer/lib/right-panel'
 import { isWindows, kbd } from '@renderer/lib/platform'
 
 interface Props {
@@ -32,22 +33,17 @@ export function RightActivityBar({
   const collapsed = useWorkspace((s) => s.rightSidebarCollapsed)
   const setCollapsed = useWorkspace((s) => s.setRightSidebarCollapsed)
 
-  const onPanelClick = (clicked: RightSidebarTab): void => {
+  const panel = { tab, collapsed }
+
+  const onPanelClick = (button: PanelButton): void => {
     if (panelDisabled) return
-    if (collapsed) {
-      setTab(clicked)
-      setCollapsed(false)
-      return
-    }
-    if (clicked === tab) {
-      setCollapsed(true)
-      return
-    }
-    setTab(clicked)
+    const next = clickPanelButton(panel, button)
+    setTab(next.tab)
+    setCollapsed(next.collapsed)
   }
 
-  const isActive = (which: RightSidebarTab): boolean =>
-    !panelDisabled && !collapsed && tab === which
+  const isActive = (button: PanelButton): boolean =>
+    !panelDisabled && isPanelButtonActive(panel, button)
 
   return (
     <aside
@@ -57,13 +53,16 @@ export function RightActivityBar({
     >
       <div className="flex flex-col items-center gap-1">
         <ActivityButton
-          active={isActive('files')}
+          active={isActive('changesFiles')}
           disabled={panelDisabled}
-          onClick={() => onPanelClick('files')}
-          label={isActive('files') ? 'Hide files panel' : 'Files'}
+          onClick={() => onPanelClick('changesFiles')}
+          label={isActive('changesFiles') ? 'Hide changes and files' : 'Changes and files'}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </ActivityButton>
         <ActivityButton
@@ -75,19 +74,6 @@ export function RightActivityBar({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <circle cx="11" cy="11" r="7" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </ActivityButton>
-        <ActivityButton
-          active={isActive('git')}
-          disabled={panelDisabled}
-          onClick={() => onPanelClick('git')}
-          label={isActive('git') ? 'Hide source control panel' : 'Source control'}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <line x1="6" y1="3" x2="6" y2="15" />
-            <circle cx="18" cy="6" r="3" />
-            <circle cx="6" cy="18" r="3" />
-            <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
         </ActivityButton>
 

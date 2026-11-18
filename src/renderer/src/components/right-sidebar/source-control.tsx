@@ -97,6 +97,9 @@ export function SourceControl({ projectId, repoRel, onChanged }: Props) {
     return <div className="px-3 py-3 text-[11px] text-foreground/40">Loading changes…</div>
   }
 
+  // A clean repo has nothing to commit; the panel says so once for the whole project.
+  if (groups.merge.length + groups.staged.length + groups.changes.length === 0) return null
+
   const canCommit = message.trim().length > 0 && groups.staged.length > 0 && !busy
 
   return (
@@ -178,9 +181,6 @@ export function SourceControl({ projectId, repoRel, onChanged }: Props) {
         ]}
       />
 
-      {groups.merge.length + groups.staged.length + groups.changes.length === 0 && (
-        <div className="px-1 py-2 text-[11px] text-foreground/40">No changes.</div>
-      )}
     </div>
   )
 }
