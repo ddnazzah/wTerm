@@ -33,6 +33,7 @@ describe('parseHookMessage', () => {
     expect(message).toEqual({
       terminalId: 'term-1',
       sessionId: 'd7e9ddbf-f3fa-45fb-83d3-98d09909f181',
+      transcriptPath: '/Users/x/.claude/projects/-Users-x/d7e9ddbf.jsonl',
       event: { kind: 'promptSubmitted' },
     })
   })
@@ -89,5 +90,17 @@ describe('parseHookMessage', () => {
     )
 
     expect(message?.sessionId).toBeNull()
+  })
+
+  it('keeps the transcript path on a Stop, which Autopilot needs to decide', () => {
+    const message = parseHookMessage(
+      JSON.stringify({ hook_event_name: 'Stop', transcript_path: '/t/s.jsonl', terminal_id: 'term-1' })
+    )
+
+    expect(message?.transcriptPath).toBe('/t/s.jsonl')
+  })
+
+  it('reports a missing transcript path as null rather than inventing one', () => {
+    expect(parseHookMessage(stop)?.transcriptPath).toBeNull()
   })
 })

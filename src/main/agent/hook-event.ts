@@ -35,6 +35,8 @@ export interface AgentHookMessage {
   terminalId: string
   /** Claude's own session id, kept so a caller can find the transcript. */
   sessionId: string | null
+  /** The session's JSONL transcript, which Autopilot reads to decide a Stop. */
+  transcriptPath: string | null
   event: AgentHookEvent
 }
 
@@ -90,5 +92,10 @@ export function parseHookMessage(
   const event = toEvent(name, record)
   if (!event) return null
 
-  return { terminalId: target, sessionId: readString(record, 'session_id'), event }
+  return {
+    terminalId: target,
+    sessionId: readString(record, 'session_id'),
+    transcriptPath: readString(record, 'transcript_path'),
+    event,
+  }
 }

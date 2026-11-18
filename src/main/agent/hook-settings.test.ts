@@ -4,6 +4,7 @@ import {
   hooksInstalled,
   installHooks,
   relayCommand,
+  STOP_HOOK_TIMEOUT_S,
   uninstallHooks,
 } from './hook-settings'
 
@@ -71,6 +72,30 @@ describe('installHooks', () => {
     const stop = (next.hooks as Record<string, { hooks: { command: string }[] }[]>).Stop
     expect(stop).toHaveLength(1)
     expect(stop[0].hooks[0].command).toBe(relayCommand(RELAY))
+  })
+})
+
+describe('Stop hook timeout', () => {
+  type Entries = Record<string, { hooks: { command: string; timeout?: number }[] }[]>
+
+  it('gives the Stop entry a timeout long enough for an Autopilot decision', () => {
+    const hooks = installHooks({}, RELAY).hooks as Entries
+
+    expect(hooks.Stop[0].hooks[0].timeout).toBe(STOP_HOOK_TIMEOUT_S)
+  })
+
+  it('leaves the other events on Claude\'s default timeout', () => {
+    const hooks = installHooks({}, RELAY).hooks as Entries
+
+    expect(hooks.UserPromptSubmit[0].hooks[0].timeout).toBeUndefined()
+    expect(hooks.Notification[0].hooks[0].timeout).toBeUndefined()
+  })
+
+  it('treats an install from before the timeout existed as stale, so it is rewritten', () => {
+    const old = { hooks: Object.fromEntries(HOOK_EVENTS.map((e) => [e, [{ hooks: [{ type: 'command', command: relayCommand(RELAY) }] }]])) }
+
+    expect(hooksInstalled(old, RELAY)).toBe(false)
+    expect(hooksInstalled(installHooks(old, RELAY), RELAY)).toBe(true)
   })
 })
 

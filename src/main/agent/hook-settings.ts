@@ -23,6 +23,21 @@ export const HOOK_EVENTS = ['UserPromptSubmit', 'Notification', 'Stop', 'Session
 interface HookCommand {
   type: string
   command: string
+  timeout?: number
+}
+
+/**
+ * Seconds Claude waits on wTerm's Stop hook. Autopilot holds that hook open while
+ * its supervisor decides, so it must outlast the supervisor's own limit
+ * (see autopilot/supervisor.ts) plus the relay's margin, or Claude kills the
+ * hook first and the decision is lost.
+ */
+export const STOP_HOOK_TIMEOUT_S = 150
+
+/** The hook entry wTerm writes for one event. */
+function relayEntry(event: string, relayPath: string): HookMatcher {
+  const command: HookCommand = { type: 'command', command: relayCommand(relayPath) }
+  return { hooks: [event === 'Stop' ? { ...command, timeout: STOP_HOOK_TIMEOUT_S } : command] }
 }
 interface HookMatcher {
   matcher?: string
@@ -64,11 +79,9 @@ export function installHooks(
   relayPath: string
 ): Record<string, unknown> {
   const map = asHookMap(settings)
-  const ours: HookMatcher = { hooks: [{ type: 'command', command: relayCommand(relayPath) }] }
-
   const nextHooks: HookMap = { ...map }
   for (const event of HOOK_EVENTS) {
-    nextHooks[event] = [...foreignEntries(map, event), ours]
+    nextHooks[event] = [...foreignEntries(map, event), relayEntry(event, relayPath)]
   }
   return { ...settings, hooks: nextHooks }
 }
@@ -92,14 +105,17 @@ export function uninstallHooks(settings: Record<string, unknown>): Record<string
 }
 
 /**
- * True when every listened-for event already points at this exact relay path.
- * A stale path (wTerm moved, or the app was reinstalled) reads as not installed
- * so the caller rewrites it.
+ * True when every listened-for event already points at this exact relay path,
+ * with the current timeout. A stale path (wTerm moved, or the app was
+ * reinstalled) or an entry from an older wTerm reads as not installed, so the
+ * caller rewrites it.
  */
 export function hooksInstalled(settings: Record<string, unknown>, relayPath: string): boolean {
   const map = asHookMap(settings)
-  const wanted = relayCommand(relayPath)
-  return HOOK_EVENTS.every((event) =>
-    entriesFor(map, event).some((entry) => entry.hooks?.some((h) => h.command === wanted))
-  )
+  return HOOK_EVENTS.every((event) => {
+    const wanted = relayEntry(event, relayPath).hooks[0]
+    return entriesFor(map, event).some((entry) =>
+      entry.hooks?.some((h) => h.command === wanted.command && h.timeout === wanted.timeout)
+    )
+  })
 }
