@@ -170,6 +170,67 @@ describe('Autopilot — sessions it must leave alone', () => {
   })
 })
 
+describe('Autopilot — decisions overtaken while the supervisor thinks', () => {
+  /** A supervisor whose answer the test releases by hand. */
+  function gated(): { h: Harness; release: (out: string, call?: number) => void } {
+    const resolvers: ((out: string) => void)[] = []
+    const h = harness()
+    h.decide.mockImplementation(() => new Promise<string>((r) => resolvers.push(r)))
+    // Releases the given call (default: the most recent one).
+    return { h, release: (out, call = resolvers.length - 1) => resolvers[call](out) }
+  }
+  const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
+
+  it('drops a decision that lands after the user typed a new prompt', async () => {
+    const { h, release } = gated()
+    const pending = h.pilot.handle(stop())
+    await tick()
+
+    h.pilot.handle(msg({ kind: 'promptSubmitted' }))
+    release(cli({ action: 'done', reply: '', summary: 'stale' }))
+
+    expect(await pending).toBeNull()
+    expect(h.applied).toEqual([{ kind: 'promptSubmitted' }]) // no "Goal reached" mid-turn
+    expect(h.pilot.snapshot(TERM).log).toEqual([])
+  })
+
+  it('lets the session stop normally when Autopilot is switched off mid-decision', async () => {
+    const { h, release } = gated()
+    const pending = h.pilot.handle(stop())
+    await tick()
+
+    h.pilot.setEnabled(TERM, false)
+    release(cli({ action: 'continue', reply: 'keep going', summary: 's' }))
+
+    expect(await pending).toBeNull()
+    expect(h.applied).toEqual([{ kind: 'turnDone' }])
+  })
+
+  it('counts only the newest of two overlapping stops', async () => {
+    const { h, release } = gated()
+    const first = h.pilot.handle(stop())
+    await tick()
+    const second = h.pilot.handle(stop())
+    await tick()
+
+    release(cli({ action: 'continue', reply: 'late', summary: 's' }), 0)
+    release(cli({ action: 'continue', reply: 'fresh', summary: 's' }), 1)
+
+    expect(await first).toBeNull()
+    expect(JSON.parse((await second) as string).reason).toBe('fresh')
+    expect(h.pilot.snapshot(TERM).continuations).toBe(1)
+  })
+
+  it('forgets a closed terminal entirely', async () => {
+    const h = harness({ defaultOn: true })
+    h.pilot.setEnabled(TERM, false)
+
+    h.pilot.forget(TERM)
+
+    expect(h.pilot.isEnabled(TERM)).toBe(true)
+  })
+})
+
 describe('Autopilot — the user taking the wheel', () => {
   it('resets the reply counter when the user types a new prompt', async () => {
     const outputs = [1, 2, 3].map((i) => cli({ action: 'continue', reply: `step ${i}`, summary: 's' }))

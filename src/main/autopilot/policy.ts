@@ -48,7 +48,8 @@ export function applyPolicy(
   if (state.lastReply !== null && verdict.reply === state.lastReply) {
     return { verdict: escalate(`Autopilot was about to repeat itself ("${verdict.reply}")`), state: seen }
   }
-  if (state.continuations > 0 && state.lastAssistant === lastAssistant) {
+  // Empty means the agent's last entry only called tools: no words to compare.
+  if (state.continuations > 0 && lastAssistant !== '' && state.lastAssistant === lastAssistant) {
     return { verdict: escalate('The session stopped on the same message again — no progress'), state: seen }
   }
   return {

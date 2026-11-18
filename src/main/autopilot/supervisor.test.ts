@@ -72,8 +72,14 @@ describe('supervisor process', () => {
 
   it('runs claude headless with no tools and no saved session', () => {
     expect(CLAUDE_ARGS).toContain('-p')
-    expect(CLAUDE_ARGS).toContain('--tools ""')
+    expect(CLAUDE_ARGS).toContain(`--tools ''`)
     expect(CLAUDE_ARGS).toContain('--no-session-persistence')
     expect(CLAUDE_ARGS).toContain('--output-format json')
+  })
+
+  it('gives the supervisor no MCP tools either, since it reads untrusted text', () => {
+    expect(CLAUDE_ARGS).toContain('--strict-mcp-config')
+    expect(CLAUDE_ARGS).toContain(`--disallowedTools 'mcp__*'`)
+    expect(CLAUDE_ARGS).toContain('--permission-mode default')
   })
 })

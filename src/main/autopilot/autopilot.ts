@@ -39,6 +39,12 @@ const blankSession = (): Session => ({ state: INITIAL_PILOT_STATE, log: [] })
 export class Autopilot {
   private readonly overrides = new Map<string, boolean>()
   private readonly sessions = new Map<string, Session>()
+  /**
+   * Bumped whenever a session's situation changes under an in-flight decision:
+   * a new Stop, a user prompt, or the session ending. A decision that comes back
+   * to a different generation is stale and dropped.
+   */
+  private readonly generations = new Map<string, number>()
 
   constructor(
     private readonly deps: AutopilotDeps,
@@ -54,8 +60,17 @@ export class Autopilot {
   }
 
   setEnabled(terminalId: string, on: boolean): void {
+    // No generation bump: a decision in flight when this is switched off still
+    // has to release its hook, and decideStop checks isEnabled for exactly that.
     this.overrides.set(terminalId, on)
     this.emit(terminalId)
+  }
+
+  /** The terminal is gone; drop everything held for it. */
+  forget(terminalId: string): void {
+    this.overrides.delete(terminalId)
+    this.sessions.delete(terminalId)
+    this.generations.delete(terminalId)
   }
 
   snapshot(terminalId: string): AutopilotSnapshot {
@@ -86,6 +101,7 @@ export class Autopilot {
    * it is the report of what was done on the user's behalf.
    */
   private userTookTurn(terminalId: string): void {
+    this.bump(terminalId)
     const session = this.sessions.get(terminalId)
     if (!session) return
     this.sessions.set(terminalId, { ...session, state: INITIAL_PILOT_STATE })
@@ -94,8 +110,17 @@ export class Autopilot {
 
   private async decideStop(message: AgentHookMessage): Promise<string | null> {
     const { terminalId } = message
+    const generation = this.bump(terminalId)
+    const before = this.sessions.get(terminalId) ?? blankSession()
+    const { verdict: proposed, lastAssistant } = await this.consult(message.transcriptPath, before.log)
+
+    if (this.generations.get(terminalId) !== generation) return null // overtaken; the hook is gone
+    if (!this.isEnabled(terminalId)) {
+      // Switched off while deciding: behave as if Autopilot had never held it.
+      this.deps.apply(terminalId, message.event)
+      return null
+    }
     const session = this.sessions.get(terminalId) ?? blankSession()
-    const { verdict: proposed, lastAssistant } = await this.consult(message.transcriptPath, session.log)
     const { verdict, state } = applyPolicy(
       session.state,
       proposed,
@@ -140,6 +165,12 @@ export class Autopilot {
         : `Autopilot needs you: ${verdict.reply || verdict.summary}`
     this.deps.apply(terminalId, { kind: 'turnDone', detail })
     return null
+  }
+
+  private bump(terminalId: string): number {
+    const next = (this.generations.get(terminalId) ?? 0) + 1
+    this.generations.set(terminalId, next)
+    return next
   }
 
   private emit(terminalId: string): void {

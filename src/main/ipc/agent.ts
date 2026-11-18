@@ -3,8 +3,8 @@ import { IPC, type AgentHooksStatus, type AutopilotSnapshot, type TerminalId } f
 import { AgentHookServer } from '../agent/hook-server'
 import { hookStatus, installAgentHooks, refreshAgentHooks, removeAgentHooks } from '../agent/hook-install'
 import { Autopilot } from '../autopilot/autopilot'
-import { createClaudeRunner } from '../autopilot/supervisor'
-import { readTranscript } from '../autopilot/transcript'
+import { createClaudeRunner, stopAllSupervisors } from '../autopilot/supervisor'
+import { createTranscriptReader } from '../autopilot/transcript'
 import type { PtyManager } from '../pty/manager'
 import { getState, mutate } from '../store/state'
 
@@ -29,15 +29,22 @@ function createAutopilot(pty: PtyManager, getWindow: () => BrowserWindow | null)
     const win = getWindow()
     if (win && !win.isDestroyed()) win.webContents.send(IPC.autopilot.changed, snapshot)
   }
-  return new Autopilot(
+  const pilot = new Autopilot(
     {
       decide: createClaudeRunner(),
-      read: (path) => readTranscript(path),
+      read: createTranscriptReader(),
       apply: (id, event) => pty.applyAgentEvent(id, event),
       changed: send,
     },
     storedDefault()
   )
+  pty.addSink({ onExit: ({ id }) => pilot.forget(id) })
+  return pilot
+}
+
+/** Only ids of terminals that exist may be toggled or queried. */
+function assertTerminal(pty: PtyManager, id: unknown): asserts id is TerminalId {
+  if (typeof id !== 'string' || !pty.has(id)) throw new Error('unknown terminal')
 }
 
 export async function startAgentHooks(): Promise<void> {
@@ -58,6 +65,7 @@ export async function startAgentHooks(): Promise<void> {
 }
 
 export async function stopAgentHooks(): Promise<void> {
+  stopAllSupervisors()
   await server?.stop()
   server = null
 }
@@ -76,9 +84,13 @@ export function registerAgentIpc(pty: PtyManager, getWindow: () => BrowserWindow
 
   ipcMain.handle(IPC.agent.status, (): Promise<AgentHooksStatus> => currentStatus())
 
-  ipcMain.handle(IPC.autopilot.snapshot, (_e, id: TerminalId): AutopilotSnapshot => pilot.snapshot(id))
-  ipcMain.handle(IPC.autopilot.setEnabled, (_e, id: TerminalId, enabled: boolean): AutopilotSnapshot => {
-    if (typeof id !== 'string' || typeof enabled !== 'boolean') throw new Error('invalid autopilot toggle')
+  ipcMain.handle(IPC.autopilot.snapshot, (_e, id: unknown): AutopilotSnapshot => {
+    assertTerminal(pty, id)
+    return pilot.snapshot(id)
+  })
+  ipcMain.handle(IPC.autopilot.setEnabled, (_e, id: unknown, enabled: unknown): AutopilotSnapshot => {
+    assertTerminal(pty, id)
+    if (typeof enabled !== 'boolean') throw new Error('invalid autopilot toggle')
     pilot.setEnabled(id, enabled)
     return pilot.snapshot(id)
   })

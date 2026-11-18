@@ -50,6 +50,12 @@ describe('applyPolicy', () => {
     expect(verdict.summary).toContain('no progress')
   })
 
+  it('does not call it "no progress" when the agent ended on tool calls with no words', () => {
+    const state: PilotState = { continuations: 1, lastReply: 'Do A', lastAssistant: '' }
+
+    expect(applyPolicy(state, go('Do B'), '').verdict.action).toBe('continue')
+  })
+
   it('passes done and escalate verdicts through untouched, recording what was seen', () => {
     const done: Verdict = { action: 'done', reply: '', summary: 'Shipped' }
 

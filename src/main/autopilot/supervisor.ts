@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import type { AutopilotDecision } from '@shared/types'
 import type { TranscriptView } from './transcript'
@@ -67,10 +67,42 @@ export function buildSupervisorPrompt(view: TranscriptView, log: readonly Autopi
 }
 
 /**
- * Arguments for the headless call. `--tools ""` removes every tool and
- * `--no-session-persistence` keeps these calls out of the user's session history.
+ * Arguments for the headless call. The supervisor reads untrusted transcript
+ * text, so it gets no way to act on it: `--tools ""` removes the built-in tools
+ * but not MCP ones, so `--strict-mcp-config` (no MCP servers load) and the
+ * `mcp__*` deny cover those — measured: without them it had the user's MCP
+ * connectors. `--permission-mode default` keeps the user's auto mode out, and
+ * `--no-session-persistence` keeps these calls out of their session history.
  */
-export const CLAUDE_ARGS = 'claude -p --output-format json --tools "" --no-session-persistence --model sonnet'
+export const CLAUDE_ARGS = [
+  'claude -p',
+  '--output-format json',
+  `--tools ''`,
+  '--strict-mcp-config',
+  `--disallowedTools 'mcp__*'`,
+  '--permission-mode default',
+  '--no-session-persistence',
+  '--model sonnet',
+].join(' ')
+
+/** Supervisors still running, so they can be killed when wTerm quits. */
+const running = new Set<ChildProcess>()
+
+/** Kill a supervisor and everything it started (it leads its own process group). */
+function killTree(child: ChildProcess): void {
+  if (child.pid === undefined) return
+  try {
+    process.kill(-child.pid, 'SIGKILL')
+  } catch {
+    // already gone
+  }
+}
+
+/** Kill every supervisor still running. Called on quit. */
+export function stopAllSupervisors(): void {
+  for (const child of running) killTree(child)
+  running.clear()
+}
 
 /**
  * The environment for the supervisor. WTERM_TERMINAL_ID is removed so the
@@ -96,11 +128,14 @@ export function createClaudeRunner(timeoutMs: number = SUPERVISOR_TIMEOUT_MS): S
         cwd: tmpdir(),
         env: supervisorEnv(process.env),
         stdio: ['pipe', 'pipe', 'pipe'],
+        detached: true, // own process group, so a kill reaches its children too
       })
+      running.add(child)
+      child.on('exit', () => running.delete(child))
       let stdout = ''
       let stderr = ''
       const timer = setTimeout(() => {
-        child.kill('SIGKILL')
+        killTree(child)
         reject(new Error(`supervisor timed out after ${Math.round(timeoutMs / 1000)}s`))
       }, timeoutMs)
       child.stdout.on('data', (d: Buffer) => (stdout += d.toString()))

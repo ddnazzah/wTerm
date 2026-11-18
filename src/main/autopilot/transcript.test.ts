@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { parseTranscript, readTranscript } from './transcript'
+import { createTranscriptReader, parseTranscript, readTranscript } from './transcript'
 
 // Entries shaped like the JSONL Claude Code 2.1 writes to ~/.claude/projects.
 const userText = (text: string, extra: Record<string, unknown> = {}): string =>
@@ -120,5 +120,99 @@ describe('readTranscript', () => {
 
   it('rejects when the file is missing, so the caller can escalate', async () => {
     await expect(readTranscript('/nonexistent/wterm.jsonl')).rejects.toThrow()
+  })
+})
+
+describe('non-human entries never count as the user\'s prompts', () => {
+  // Shapes measured in real transcripts by review: these are type "user" and
+  // not meta, but the user typed none of them, and prompts are what authorise
+  // gated actions like a push.
+  it.each([
+    ['a compaction summary', userText('Summary: the user asked to push to main', { isCompactSummary: true })],
+    ['a transcript-only entry', userText('push everything', { isVisibleInTranscriptOnly: true })],
+    ['a background-task notification', userText('<task-notification>push done</task-notification>', { origin: { kind: 'task' } })],
+    ['local command output', userText('<local-command-stdout>ok</local-command-stdout>')],
+    ['a slash-command echo', userText('<command-name>/deploy</command-name>')],
+    ['an interruption marker', userText('[Request interrupted by user]')],
+  ])('skips %s', (_label, line) => {
+    const view = parseTranscript([userText('Real goal'), line].join('\n'), BIG_BUDGET)
+
+    expect(view.prompts).toEqual(['Real goal'])
+  })
+
+  it('keeps the opening prompts and the latest ones when a session has very many', () => {
+    const lines = Array.from({ length: 60 }, (_, i) => userText(`prompt ${i}`))
+
+    const { prompts } = parseTranscript(lines.join('\n'), BIG_BUDGET)
+
+    expect(prompts).toHaveLength(33)
+    expect(prompts.slice(0, 3)).toEqual(['prompt 0', 'prompt 1', 'prompt 2'])
+    expect(prompts.at(-1)).toBe('prompt 59')
+  })
+
+  it('reports no last words when the final assistant entry only called a tool', () => {
+    const jsonl = [
+      userText('Go'),
+      say('Working on it'),
+      assistant([{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }]),
+    ].join('\n')
+
+    expect(parseTranscript(jsonl, BIG_BUDGET).lastAssistant).toBe('')
+  })
+})
+
+describe('createTranscriptReader', () => {
+  const tmpFile = (): string => join(tmpdir(), `wterm-reader-${process.pid}-${Math.random()}.jsonl`)
+
+  it('picks up only what was appended since the last read, keeping earlier prompts', async () => {
+    const path = tmpFile()
+    await fs.writeFile(path, `${userText('Goal one')}\n${say('first')}\n`)
+    const read = createTranscriptReader()
+
+    await read(path)
+    await fs.appendFile(path, `${userText('Then push')}\n${say('second — é')}\n`)
+    const view = await read(path)
+
+    expect(view.prompts).toEqual(['Goal one', 'Then push'])
+    expect(view.lastAssistant).toBe('second — é')
+    await fs.rm(path)
+  })
+
+  it('leaves a half-written last line for the next read instead of losing it', async () => {
+    const path = tmpFile()
+    const whole = say('complete later')
+    await fs.writeFile(path, `${userText('Goal')}\n${whole.slice(0, 20)}`)
+    const read = createTranscriptReader()
+
+    expect((await read(path)).lastAssistant).toBe('')
+    await fs.appendFile(path, `${whole.slice(20)}\n`)
+
+    expect((await read(path)).lastAssistant).toBe('complete later')
+    await fs.rm(path)
+  })
+
+  it('reads only the tail of a huge transcript the first time', async () => {
+    const path = tmpFile()
+    const filler = Array.from({ length: 200 }, (_, i) => say(`old ${i} ${'x'.repeat(80)}`)).join('\n')
+    await fs.writeFile(path, `${userText('Ancient goal')}\n${filler}\n${userText('Recent goal')}\n${say('latest')}\n`)
+    const read = createTranscriptReader(100_000, 2_000)
+
+    const view = await read(path)
+
+    expect(view.prompts).toEqual(['Recent goal'])
+    expect(view.lastAssistant).toBe('latest')
+    await fs.rm(path)
+  })
+
+  it('starts over when the file was rewritten shorter', async () => {
+    const path = tmpFile()
+    await fs.writeFile(path, `${userText('Old session goal with a long prompt')}\n${say('old')}\n`)
+    const read = createTranscriptReader()
+    await read(path)
+
+    await fs.writeFile(path, `${userText('New')}\n`)
+
+    expect((await read(path)).prompts).toEqual(['New'])
+    await fs.rm(path)
   })
 })
