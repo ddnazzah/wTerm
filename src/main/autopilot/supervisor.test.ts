@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildSupervisorPrompt, CLAUDE_ARGS, supervisorEnv, type DecisionRecord } from './supervisor'
+import type { AutopilotDecision } from '@shared/types'
+import { buildSupervisorPrompt, CLAUDE_ARGS, supervisorEnv } from './supervisor'
 import type { TranscriptView } from './transcript'
 
 const view: TranscriptView = {
@@ -32,7 +33,7 @@ describe('buildSupervisorPrompt', () => {
   })
 
   it('includes only the newest earlier decisions, so the prompt stays bounded', () => {
-    const log: DecisionRecord[] = Array.from({ length: 30 }, (_, i) => ({
+    const log: AutopilotDecision[] = Array.from({ length: 30 }, (_, i) => ({
       at: i,
       action: 'continue',
       reply: `reply-${i}`,

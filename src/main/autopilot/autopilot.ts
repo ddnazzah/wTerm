@@ -1,6 +1,7 @@
+import type { AutopilotDecision, AutopilotSnapshot } from '@shared/types'
 import type { AgentHookEvent, AgentHookMessage } from '../agent/hook-event'
 import { applyPolicy, INITIAL_PILOT_STATE, MAX_CONTINUATIONS, type PilotState } from './policy'
-import { buildSupervisorPrompt, type DecisionRecord } from './supervisor'
+import { buildSupervisorPrompt } from './supervisor'
 import type { TranscriptView } from './transcript'
 import { parseVerdict, type Verdict } from './verdict'
 
@@ -11,14 +12,7 @@ import { parseVerdict, type Verdict } from './verdict'
 // supervisor decides. Everything else goes straight to the activity machine, so
 // with Autopilot off wTerm behaves exactly as it did before.
 
-export interface AutopilotSnapshot {
-  terminalId: string
-  enabled: boolean
-  /** Replies sent since the user last typed. */
-  continuations: number
-  /** Every decision made on the user's behalf, oldest first. */
-  log: DecisionRecord[]
-}
+export type { AutopilotSnapshot }
 
 export interface AutopilotDeps {
   /** Run the supervisor; resolves with its raw stdout. */
@@ -34,7 +28,7 @@ export interface AutopilotDeps {
 
 interface Session {
   state: PilotState
-  log: DecisionRecord[]
+  log: AutopilotDecision[]
 }
 
 /** Decisions kept per session; older ones fall off. */
@@ -104,7 +98,7 @@ export class Autopilot {
       lastAssistant,
       this.deps.maxContinuations ?? MAX_CONTINUATIONS
     )
-    const record: DecisionRecord = { at: this.now(), ...verdict }
+    const record: AutopilotDecision = { at: this.now(), ...verdict }
     this.sessions.set(terminalId, { state, log: [...session.log, record].slice(-LOG_MAX) })
     this.emit(terminalId)
     return this.act(terminalId, verdict)
@@ -113,7 +107,7 @@ export class Autopilot {
   /** Ask the supervisor. Never throws: any failure becomes an escalation. */
   private async consult(
     transcriptPath: string | null,
-    log: readonly DecisionRecord[]
+    log: readonly AutopilotDecision[]
   ): Promise<{ verdict: Verdict; lastAssistant: string }> {
     let lastAssistant = ''
     try {

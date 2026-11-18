@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
+import type { AutopilotDecision } from '@shared/types'
 import type { TranscriptView } from './transcript'
 
 // The supervisor: one headless Claude call that decides what to do when an
@@ -8,13 +9,6 @@ import type { TranscriptView } from './transcript'
 // It runs as `claude -p` on the user's own login, so there is no API key to
 // manage, and it loads the user's global CLAUDE.md — the same rules they wrote
 // for themselves. It gets no tools: it reads, decides and answers, nothing else.
-
-export interface DecisionRecord {
-  at: number
-  action: string
-  reply: string
-  summary: string
-}
 
 /** Runs the supervisor on a prompt and resolves with its raw stdout. */
 export type SupervisorRunner = (prompt: string) => Promise<string>
@@ -52,7 +46,7 @@ function section(title: string, body: string): string {
   return `## ${title}\n${body.trim().length > 0 ? body : '(none)'}`
 }
 
-export function buildSupervisorPrompt(view: TranscriptView, log: readonly DecisionRecord[]): string {
+export function buildSupervisorPrompt(view: TranscriptView, log: readonly AutopilotDecision[]): string {
   const prompts = view.prompts.map((p, i) => `${i + 1}. ${p}`).join('\n')
   const decisions = log
     .slice(-LOG_LINES_SHOWN)

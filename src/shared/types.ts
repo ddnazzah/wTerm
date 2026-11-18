@@ -93,6 +93,8 @@ export interface AppState {
   notes?: Note[]
   /** Per-project board/worker configuration. */
   boardByProject?: Record<ProjectId, BoardSettings>
+  /** Whether Claude sessions start on Autopilot. Missing = on. */
+  autopilotDefaultOn?: boolean
 }
 
 // ---- Project board ----
@@ -339,6 +341,25 @@ export type AgentHooksStatus = {
   error: string | null
 }
 
+/** One choice Autopilot made on the user's behalf (see main/autopilot). */
+export type AutopilotDecision = {
+  at: number
+  action: 'continue' | 'done' | 'escalate'
+  /** The reply sent to the agent, or the question handed back to the user. */
+  reply: string
+  summary: string
+}
+
+/** A session's Autopilot state, pushed to the renderer whenever it changes. */
+export type AutopilotSnapshot = {
+  terminalId: TerminalId
+  enabled: boolean
+  /** Replies sent since the user last typed. */
+  continuations: number
+  /** Every decision made on the user's behalf, oldest first. */
+  log: AutopilotDecision[]
+}
+
 /** Sent by the renderer so main can suppress notifications for the on-screen session. */
 export type SetFocusedPayload = { id: TerminalId | null; windowFocused: boolean }
 
@@ -371,6 +392,13 @@ export const IPC = {
     status: 'agent:hooks-status',
     install: 'agent:hooks-install',
     uninstall: 'agent:hooks-uninstall',
+  },
+  autopilot: {
+    snapshot: 'autopilot:snapshot',
+    setEnabled: 'autopilot:set-enabled',
+    getDefault: 'autopilot:get-default',
+    setDefault: 'autopilot:set-default',
+    changed: 'autopilot:changed',
   },
   dialog: {
     pickFolder: 'dialog:pick-folder',

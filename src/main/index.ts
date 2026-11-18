@@ -127,7 +127,7 @@ app.whenReady().then(async () => {
   registerFsIpc()
   registerGitIpc()
   registerGitHubIpc()
-  registerAgentIpc()
+  registerAgentIpc(ptyManager, () => mainWindow)
   registerUpdater()
 
   createWindow()
@@ -185,7 +185,7 @@ app.whenReady().then(async () => {
   // Start the loopback listener that Claude Code's hooks report into. A bind
   // failure must not take the app down — wTerm falls back to reading window
   // titles, which is less precise but still works.
-  startAgentHooks(ptyManager).catch((err) =>
+  startAgentHooks().catch((err) =>
     console.error('[agent-hook] failed to start:', err)
   )
 
