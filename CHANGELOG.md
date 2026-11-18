@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.9.1
 
 ### Changed
 
-- **Autopilot lives on the session dot**: the `AUTO` tag is gone. A thin ring around
-  a session's status dot means Autopilot is on, and it spins while Autopilot is
-  choosing a reply. Right-click a session to switch Autopilot on or off and to see
+- **Autopilot lives on the session dot**: the `AUTO` tag is gone. A dotted ring
+  around a session's status dot means Autopilot is on, and it turns into a spinning
+  arc while Autopilot is choosing a reply. Right-click a session to switch Autopilot on or off and to see
   its recent decisions.
 
 ## 0.9.0
